@@ -4,7 +4,7 @@ Proyecto de hackathon. Equipo: 1 desarrollador + 1 QA. Este archivo es la fuente
 
 Producto: Reto 01 de Kognia Labs, Agente Vocal Cognitivo. Es un agente de voz que habla sobre un documento subido en vivo y consulta por API el dataset de IPS de datos.gov.co, con transcripción diarizada y panel de sentimiento. Requerimientos en `V2.xlsx`; plan, requerimientos inferidos y arquitectura en `docs/PLAN.md`.
 
-Despliegue: Google Cloud Run, proyecto `ourtalent-509101`, región `us-east1`. Los secretos van en Secret Manager. Al terminar el evento se desmonta todo (ver `docs/PLAN.md`, sección 7).
+Despliegue: Google Cloud Run, proyecto `agente-vocal-hackaton` (creado solo para el evento), región `us-east1`. Los secretos van en Secret Manager. Al terminar el evento se desmonta todo (ver `docs/PLAN.md`, sección 7).
 
 ## 1. Skills y herramientas obligatorias
 

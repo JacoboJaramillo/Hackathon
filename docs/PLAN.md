@@ -1,6 +1,6 @@
 # Plan de trabajo: Reto 01, Agente Vocal Cognitivo
 
-Fuente: `V2.xlsx` (hoja "01 RETO"). Equipo: 1 desarrollador + 1 QA. Despliegue: Google Cloud, proyecto `ourtalent-509101`.
+Fuente: `V2.xlsx` (hoja "01 RETO"). Equipo: 1 desarrollador + 1 QA. Despliegue: Google Cloud, proyecto `agente-vocal-hackaton`.
 
 ## 1. Qué hay que construir
 
@@ -78,7 +78,7 @@ La regla es desplegar primero: hay URL pública desde el paso 1 y cada paso term
 
 | Paso | Qué | Quién | Paralelo | Hecho cuando |
 |---|---|---|---|---|
-| 0 | Preparación: cuentas y claves (Deepgram, LLM, TTS, token datos.gov.co), repositorio GitHub, `gcloud config set project ourtalent-509101`, budget alert | Ambos | Sí | Claves en Secret Manager, repositorio creado |
+| 0 | Preparación: cuentas y claves (Deepgram, LLM, TTS, token datos.gov.co), repositorio GitHub, `gcloud config set project agente-vocal-hackaton`, budget alert | Ambos | Sí | Claves en Secret Manager, repositorio creado |
 | 1 | Esqueleto: FastAPI + React estático en un contenedor, Dockerfile, despliegue a Cloud Run | Dev | QA escribe casos desde la tabla de requerimientos | URL HTTPS responde `/health` y la página |
 | 2 | Ingesta y brief (RF-01, 02, 03) | Dev | QA prepara documentos de prueba variados (PDF escaneado, DOCX largo, CSV, archivo corrupto) | Subir documento devuelve brief y preguntas |
 | 3 | Bucle de voz: micrófono, WebSocket, Deepgram, RAG + LLM, TTS (RF-04, 06) | Dev | Agentes en paralelo: frontend de audio y backend de pipeline, con contrato de eventos fijo | Pregunta hablada, respuesta hablada con el umbral de latencia |
@@ -96,12 +96,11 @@ La regla es desplegar primero: hay URL pública desde el paso 1 y cada paso term
 ## 6. Despliegue en GCP
 
 ```bash
-gcloud config set project ourtalent-509101
+gcloud config set project agente-vocal-hackaton
 gcloud config set run/region us-east1
 
 # Secretos (una vez por clave)
-printf '%s' "$DEEPGRAM_API_KEY" | gcloud secrets create deepgram-api-key --data-file=-
-# repetir para llm-api-key, tts-api-key, datosgov-app-token
+# Ya creados: deepseek-api-key, deepgram-api-key, datosgov-app-token (us-east1)
 
 # Build y despliegue desde el código fuente (Cloud Build + Artifact Registry)
 gcloud run deploy agente-vocal \
@@ -111,7 +110,7 @@ gcloud run deploy agente-vocal \
   --timeout 3600 \
   --min-instances 0 --max-instances 3 \
   --cpu 2 --memory 2Gi --concurrency 20 \
-  --set-secrets DEEPGRAM_API_KEY=deepgram-api-key:latest,LLM_API_KEY=llm-api-key:latest,TTS_API_KEY=tts-api-key:latest,DATOSGOV_APP_TOKEN=datosgov-app-token:latest
+  --set-secrets DEEPGRAM_API_KEY=deepgram-api-key:latest,DEEPSEEK_API_KEY=deepseek-api-key:latest,DATOSGOV_APP_TOKEN=datosgov-app-token:latest
 
 # Solo durante la ventana de evaluación
 gcloud run services update agente-vocal --min-instances 1
@@ -126,14 +125,12 @@ gcloud run services update agente-vocal --min-instances 1
 **Irreversible.** Borra el servicio y sus datos. Hacerlo solo después de que el jurado termine de calificar.
 
 ```bash
-gcloud run services delete agente-vocal --region us-east1
-gcloud artifacts repositories delete cloud-run-source-deploy --location us-east1
-gcloud secrets delete deepgram-api-key; gcloud secrets delete llm-api-key
-gcloud secrets delete tts-api-key; gcloud secrets delete datosgov-app-token
-gsutil -m rm -r gs://ourtalent-509101_cloudbuild   # bucket de fuentes de Cloud Build, si existe
+gcloud projects delete agente-vocal-hackaton
 ```
 
-Después: revocar las claves de los proveedores (Deepgram, LLM, TTS, datos.gov.co) y revisar la facturación a las 24 horas. No se borra el proyecto completo porque OurTalent puede tener otros usos.
+Esto borra en un solo paso el servicio, las imágenes, los secretos y los buckets, porque el proyecto se creó solo para el evento.
+
+Después: revocar las claves de los proveedores (Deepgram, DeepSeek, datos.gov.co) y revisar la facturación a las 24 horas.
 
 ## 8. Riesgos y plan B
 
