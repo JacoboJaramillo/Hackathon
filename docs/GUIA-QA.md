@@ -38,6 +38,13 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: ADR 0001 cites only the uploaded document as a source
+Fecha: 2026-10-09, 10:05.
+
+Qué se hizo: el agente ya no dice "según el registro oficial de prestadores, con corte a noviembre de 2022" en cada dato. Solo cita "según tu documento" cuando el dato viene del documento subido.
+
+Cómo probarlo (desde el paso 4): preguntar algo del documento y algo del registro. Resultado esperado: la primera respuesta incluye "según tu documento"; la segunda da el dato sin frase de fuente.
+
 ### docs: ADR 0001 defines the agent mission and conversation design
 Fecha: 2026-10-09, 10:10.
 
