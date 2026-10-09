@@ -10,9 +10,11 @@
     "test": "node --test server/*.test.mjs"
   },
   "dependencies": {
+    "fflate": "0.8.3",
     "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "unpdf": "1.8.1",
     "ws": "8.22.0"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 # Protocolo del WebSocket `/ws/agent`
 
-Contrato entre el navegador y el servidor para la conversación por voz. Implementación: `web/server.mjs` y `web/server/limits.mjs`. El upgrade HTTP y sus respuestas de rechazo también están en `docs/api/openapi.yaml`. Requerimientos: RF-004, RF-005, RF-009, RF-019, RNF-004.
+Contrato entre el navegador y el servidor para la conversación por voz. Implementación: `web/server.mjs` y `web/server/limits.mjs`. El upgrade HTTP y sus respuestas de rechazo también están en `docs/api/openapi.yaml`. Requerimientos: RF-002, RF-004, RF-005, RF-009, RF-019, RNF-004.
 
 El servidor es un proxy filtrante hacia la Voice Agent API de Deepgram (`wss://agent.deepgram.com/v1/agent/converse`). El navegador nunca habla con Deepgram y nunca ve el mensaje `Settings`.
 
@@ -16,21 +16,24 @@ Sec-WebSocket-Version: 13
 Sec-WebSocket-Key: <clave aleatoria>
 ```
 
-URL: `wss://agente-vocal-583590264456.us-east1.run.app/ws/agent`. No lleva parámetros ni subprotocolo.
+URL: `wss://agente-vocal-583590264456.us-east1.run.app/ws/agent`, con el parámetro opcional `?doc=<documentId>`. No usa subprotocolo.
+
+`doc` es el UUID que devuelve `POST /api/document`. Si viene, el agente de esa sesión usa el texto del documento como contexto (RF-002). El documento vive solo en memoria de la instancia durante 30 minutos. Un `doc` con formato inválido, desconocido o vencido se rechaza con `404 Not Found` antes del handshake y antes de consumir cupo de sesión. Sin `doc`, la sesión funciona como siempre, solo con el registro de IPS.
 
 Controles de admisión, en este orden, antes de completar el handshake:
 
 | Orden | Control | Valor por defecto | Variable de entorno | Rechazo | Motivo en el log |
 |---|---|---|---|---|---|
 | 1 | Origin en la lista blanca | Coincidencia exacta | `ALLOWED_ORIGINS` (lista separada por comas) | `403 Forbidden` | `bad_origin` |
-| 2 | Intentos de conexión por IP en los últimos 60 s | 10 | `MAX_CONNECTS_PER_MIN` | `429 Too Many Requests` con `Retry-After: 60` | `rate_limited` |
-| 3 | Sesiones activas en la instancia | 8 | `MAX_SESSIONS` | `503 Service Unavailable` | `global_cap` |
-| 4 | Sesiones activas de la misma IP | 2 | `MAX_SESSIONS_PER_IP` | `429 Too Many Requests` con `Retry-After: 60` | `ip_cap` |
+| 2 | Documento vigente, solo si viene `doc` | UUID v4 existente y no vencido (30 min) | Ninguna | `404 Not Found` | `doc_not_found` |
+| 3 | Intentos de conexión por IP en los últimos 60 s | 10 | `MAX_CONNECTS_PER_MIN` | `429 Too Many Requests` con `Retry-After: 60` | `rate_limited` |
+| 4 | Sesiones activas en la instancia | 8 | `MAX_SESSIONS` | `503 Service Unavailable` | `global_cap` |
+| 5 | Sesiones activas de la misma IP | 2 | `MAX_SESSIONS_PER_IP` | `429 Too Many Requests` con `Retry-After: 60` | `ip_cap` |
 
 Notas:
 
 - Los rechazos responden con cuerpo vacío, `Connection: close` y cierre del socket.
-- Todo intento que pasa el control de Origin cuenta para la tasa, incluso si después se rechaza.
+- Todo intento que pasa los controles de Origin y de documento cuenta para la tasa, incluso si después se rechaza. Un `doc` inválido no cuenta ni consume cupo.
 - La IP del cliente es la última entrada de `X-Forwarded-For` (la que agrega Cloud Run); si no hay cabecera, la dirección del socket.
 - Los contadores son por instancia de Cloud Run.
 - En producción, un upgrade a cualquier otra ruta se corta sin respuesta.

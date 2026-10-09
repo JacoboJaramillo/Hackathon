@@ -25,6 +25,8 @@ security: []
 tags:
   - name: operacion
     description: Salud del servicio.
+  - name: documento
+    description: Carga del documento de la persona y su brief.
   - name: voz
     description: Conversación por voz.
 paths:
@@ -56,6 +58,102 @@ paths:
                 $ref: "#/components/schemas/Health"
               example:
                 status: ok
+  /api/document:
+    post:
+      tags: [documento]
+      operationId: uploadDocument
+      summary: Sube un documento y devuelve su brief
+      description: |
+        El cuerpo es el archivo en bruto (no multipart). El servidor detecta el
+        tipo real por su firma: PDF (`%PDF-`), DOCX (ZIP con `word/document.xml`)
+        o TXT (UTF-8 válido sin bytes nulos). La extensión y el Content-Type que
+        envía el cliente no se usan para decidir el tipo. El nombre original no
+        se recibe ni se guarda; el servidor genera `documentId` (UUID v4).
+
+        El texto extraído se guarda solo en memoria de la instancia, como máximo
+        20 000 caracteres (si hay más, `truncado` es true), durante 30 minutos.
+        No hay base de datos ni disco. Con ese `documentId` se abre la sesión de
+        voz en `/ws/agent?doc=<documentId>`.
+
+        El brief lo genera DeepSeek con un plazo de 25 s. Si falla, la carga
+        igual se acepta y `brief` es null: la persona puede hablar del documento.
+
+        Controles: Origin en ALLOWED_ORIGINS (403), 5 cargas por minuto y 1
+        simultánea por IP (429), 20 MB como máximo (413).
+      x-requirement: [RF-001, RF-003, RNF-004]
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              maxLength: 20971520
+      responses:
+        "201":
+          description: Documento aceptado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentCreated"
+              example:
+                documentId: 0b9f6c1e-3a52-4d0e-9a51-6f1d2b7c8e90
+                tipo: pdf
+                caracteres: 18342
+                truncado: false
+                brief:
+                  resumen: Contrato de prestación de servicios de salud entre una EPS y una IPS de Leticia.
+                  preguntas:
+                    - ¿Qué servicios cubre el contrato?
+                    - ¿Cuánto dura el contrato?
+                    - ¿Qué pasa si la IPS incumple?
+        "400":
+          description: Cuerpo vacío (vacio).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: Origin ausente o fuera de la lista blanca (origen_no_permitido).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: Más de 20 MB (demasiado_grande).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: La firma no es PDF, DOCX ni TXT, o el archivo está corrupto (tipo_no_soportado).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: El archivo es válido pero no tiene texto extraíble, por ejemplo un PDF escaneado (sin_texto).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Más de 5 cargas por minuto o una carga en curso desde la IP (demasiadas_cargas).
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                const: 60
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Fallo inesperado del servidor (error_interno). El detalle queda solo en los logs.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /ws/agent:
     get:
       tags: [voz]
@@ -65,15 +163,26 @@ paths:
         Upgrade HTTP a WebSocket. Tras el 101, el protocolo de mensajes está en
         docs/api/websocket-protocol.md.
 
+        Si viene `doc`, la sesión usa ese documento como contexto del agente;
+        un `doc` con formato inválido, desconocido o vencido se rechaza con 404
+        antes de consumir cupo.
+
         Controles de admisión, en este orden: Origin en la lista blanca
-        ALLOWED_ORIGINS (403), tasa de 10 intentos por minuto por IP (429),
+        ALLOWED_ORIGINS (403), documento (404), tasa de 10 intentos por minuto por IP (429),
         cupo global de 8 sesiones por instancia (503) y cupo de 2 sesiones
         simultáneas por IP (429). La IP del cliente es la última entrada de
         X-Forwarded-For. Los rechazos tienen cuerpo vacío y cierran la conexión.
-      x-requirement: [RF-004, RF-005, RF-009, RF-019, RNF-004]
+      x-requirement: [RF-002, RF-004, RF-005, RF-009, RF-019, RNF-004]
       x-protocol: websocket
       x-protocol-doc: docs/api/websocket-protocol.md
       parameters:
+        - name: doc
+          in: query
+          required: false
+          description: documentId devuelto por POST /api/document.
+          schema:
+            type: string
+            format: uuid
         - name: Origin
           in: header
           required: true
@@ -104,6 +213,8 @@ paths:
           description: Upgrade aceptado. Comienza la sesión WebSocket.
         "403":
           description: Origin ausente o fuera de la lista blanca (motivo bad_origin).
+        "404":
+          description: El parámetro doc no corresponde a un documento vigente (doc_not_found).
         "429":
           description: Más de 10 intentos por minuto desde la IP (rate_limited) o ya hay 2 sesiones activas de la IP (ip_cap).
           headers:
@@ -124,6 +235,57 @@ components:
         status:
           type: string
           const: ok
+    DocumentCreated:
+      type: object
+      additionalProperties: false
+      required: [documentId, tipo, caracteres, truncado, brief]
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [pdf, docx, txt]
+        caracteres:
+          type: integer
+          minimum: 1
+          maximum: 20000
+          description: Caracteres de texto guardados para la conversación.
+        truncado:
+          type: boolean
+          description: true si el documento tenía más de 20 000 caracteres y se cortó.
+        brief:
+          oneOf:
+            - $ref: "#/components/schemas/Brief"
+            - type: "null"
+    Brief:
+      type: object
+      additionalProperties: false
+      required: [resumen, preguntas]
+      properties:
+        resumen:
+          type: string
+          minLength: 1
+          maxLength: 600
+        preguntas:
+          type: array
+          minItems: 3
+          maxItems: 5
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error, mensaje]
+      properties:
+        error:
+          type: string
+          enum: [vacio, origen_no_permitido, demasiado_grande, tipo_no_soportado, sin_texto, demasiadas_cargas, error_interno]
+        mensaje:
+          type: string
+          description: Texto en español para mostrar a la persona. Nunca incluye detalles internos.
   headers:
     Strict-Transport-Security:
       schema:

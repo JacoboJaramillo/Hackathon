@@ -1,6 +1,6 @@
 flowchart LR
   subgraph nav["Navegador - no confiable"]
-    ui["Interfaz React - tarjetas de sedes, planeado"]
+    ui["Interfaz React - carga y brief; voz y tarjetas planeadas"]
     mic["Captura de micrófono - PCM 16 kHz linear16"]
   end
 
@@ -10,7 +10,7 @@ flowchart LR
     limits["server/limits.mjs - admisión: Origin, cupos y tasa"]
     settings["server/agent-settings.mjs - prompt y mensaje Settings"]
     ips["server/ips.mjs - herramienta buscar_sedes"]
-    docmod["Documento y brief - planeado"]
+    docmod["server/documents.mjs y brief.mjs - texto en memoria y brief"]
     diar["Transcripción diarizada y sentimiento - planeado"]
   end
 
@@ -24,7 +24,9 @@ flowchart LR
   srv --> limits
   srv --> settings
   srv --> ips
-  srv -.-> docmod
+  ui -- "POST /api/document" --> srv
+  srv --> docmod
+  docmod -- "HTTPS brief" --> deepseek
   srv -.-> diar
   srv -- "WSS con Authorization Token" --> deepgram
   deepgram -- "HTTPS" --> deepseek

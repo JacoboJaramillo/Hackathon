@@ -8,6 +8,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { createLimiter, isAllowedOrigin, clientIp } from './server/limits.mjs';
 import { buildSettings } from './server/agent-settings.mjs';
 import { buscarSedes } from './server/ips.mjs';
+import { parseDocument, createDocumentStore, MAX_BYTES } from './server/documents.mjs';
+import { generateBrief } from './server/brief.mjs';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT) || 3000;
@@ -40,6 +42,9 @@ const limiter = createLimiter({
   global: Number(process.env.MAX_SESSIONS) || 8,
   ratePerMin: Number(process.env.MAX_CONNECTS_PER_MIN) || 10,
 });
+// Each upload may trigger a paid DeepSeek call for the brief.
+const uploads = createLimiter({ perIp: 1, global: 4, ratePerMin: 5 });
+const documents = createDocumentStore();
 const hashIp = (ip) => createHash('sha256').update(ip).digest('hex').slice(0, 12);
 const logEvent = (event, fields) => console.log(JSON.stringify({ severity: 'INFO', event, ...fields }));
 
@@ -47,17 +52,22 @@ const app = next({ dev, port });
 const handle = app.getRequestHandler();
 await app.prepare();
 
-const server = createServer((req, res) => handle(req, res));
+const server = createServer((req, res) => {
+  if (new URL(req.url, 'http://localhost').pathname === '/api/document') return handleUpload(req, res);
+  return handle(req, res);
+});
 const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES });
+
+const STATUS_TEXT = { 403: 'Forbidden', 404: 'Not Found', 429: 'Too Many Requests', 503: 'Service Unavailable' };
 
 function reject(socket, status, reason, fields) {
   logEvent('ws_rejected', { reason, status, ...fields });
-  socket.write(`HTTP/1.1 ${status} ${status === 403 ? 'Forbidden' : status === 503 ? 'Service Unavailable' : 'Too Many Requests'}\r\nConnection: close\r\nContent-Length: 0\r\n${status === 429 ? 'Retry-After: 60\r\n' : ''}\r\n`);
+  socket.write(`HTTP/1.1 ${status} ${STATUS_TEXT[status]}\r\nConnection: close\r\nContent-Length: 0\r\n${status === 429 ? 'Retry-After: 60\r\n' : ''}\r\n`);
   socket.destroy();
 }
 
 server.on('upgrade', (req, socket, head) => {
-  const { pathname } = new URL(req.url, 'http://localhost');
+  const { pathname, searchParams } = new URL(req.url, 'http://localhost');
   if (pathname !== '/ws/agent') {
     if (dev) return app.getUpgradeHandler()(req, socket, head);
     return socket.destroy();
@@ -67,13 +77,18 @@ server.on('upgrade', (req, socket, head) => {
   if (!isAllowedOrigin(req.headers.origin, ALLOWED_ORIGINS)) {
     return reject(socket, 403, 'bad_origin', { id, ip: hashIp(ip) });
   }
+  const docId = searchParams.get('doc');
+  const doc = docId === null ? null : documents.get(docId);
+  if (docId !== null && !doc) return reject(socket, 404, 'doc_not_found', { id, ip: hashIp(ip) });
   const slot = limiter.admit(ip);
   if (!slot.ok) return reject(socket, slot.status, slot.reason, { id, ip: hashIp(ip) });
-  wss.handleUpgrade(req, socket, head, (client) => runSession(client, { id, ip: hashIp(ip), release: slot.release }));
+  wss.handleUpgrade(req, socket, head, (client) => runSession(client, {
+    id, ip: hashIp(ip), release: slot.release, documentText: doc?.text || '',
+  }));
 });
 
-function runSession(client, { id, ip, release }) {
-  logEvent('session_start', { id, ip });
+function runSession(client, { id, ip, release, documentText }) {
+  logEvent('session_start', { id, ip, document: Boolean(documentText) });
   const started = Date.now();
   const upstream = new WebSocket(DEEPGRAM_URL, {
     headers: { Authorization: `Token ${DEEPGRAM_API_KEY}` },
@@ -95,7 +110,7 @@ function runSession(client, { id, ip, release }) {
   const sendClient = (obj) => client.readyState === WebSocket.OPEN && client.send(JSON.stringify(obj));
 
   upstream.on('open', () => {
-    upstream.send(JSON.stringify(buildSettings({ deepseekKey: DEEPSEEK_API_KEY })));
+    upstream.send(JSON.stringify(buildSettings({ deepseekKey: DEEPSEEK_API_KEY, documentText })));
     for (const frame of pending.splice(0)) upstream.send(frame);
   });
 
@@ -150,6 +165,68 @@ function runSession(client, { id, ip, release }) {
   });
   client.on('close', () => close(1000, 'client_closed'));
   client.on('error', () => close(1011, 'client_error'));
+}
+
+const JSON_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+};
+const UPLOAD_ERRORS = {
+  origen_no_permitido: [403, 'No se aceptan cargas desde este sitio.'],
+  demasiado_grande: [413, 'El archivo supera 20 MB. Sube uno más pequeño.'],
+  demasiadas_cargas: [429, 'Hiciste muchas cargas seguidas. Espera un minuto e intenta de nuevo.'],
+  error_interno: [500, 'No pudimos procesar tu documento. Intenta de nuevo.'],
+};
+
+// POST /api/document (docs/api/openapi.yaml). Raw body, type decided by
+// signature inside parseDocument; the client name and Content-Type are ignored.
+async function handleUpload(req, res) {
+  const reply = (status, body, headers = {}) => {
+    if (res.headersSent) return;
+    res.writeHead(status, { ...JSON_HEADERS, ...headers });
+    res.end(JSON.stringify(body));
+  };
+  const fail = (error, headers) => {
+    const [status, mensaje] = UPLOAD_ERRORS[error];
+    reply(status, { error, mensaje }, headers);
+    req.resume();
+  };
+  if (req.method !== 'POST') {
+    res.writeHead(405, { ...JSON_HEADERS, Allow: 'POST' });
+    return res.end();
+  }
+  const ip = clientIp(req);
+  if (!isAllowedOrigin(req.headers.origin, ALLOWED_ORIGINS)) return fail('origen_no_permitido');
+  if (Number(req.headers['content-length']) > MAX_BYTES) return fail('demasiado_grande', { Connection: 'close' });
+  const slot = uploads.admit(ip);
+  if (!slot.ok) return fail('demasiadas_cargas', { 'Retry-After': '60' });
+  const started = Date.now();
+  try {
+    req.setTimeout(30_000, () => req.destroy());
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > MAX_BYTES) return fail('demasiado_grande', { Connection: 'close' });
+      chunks.push(chunk);
+    }
+    const parsed = await parseDocument(Buffer.concat(chunks));
+    if (!parsed.ok) return reply(parsed.status, { error: parsed.error, mensaje: parsed.mensaje });
+    const brief = await generateBrief(parsed.text, { apiKey: DEEPSEEK_API_KEY });
+    const documentId = documents.put({ tipo: parsed.tipo, text: parsed.text });
+    logEvent('document_uploaded', {
+      ip: hashIp(ip), tipo: parsed.tipo, caracteres: parsed.caracteres, truncado: parsed.truncado,
+      brief: Boolean(brief), ms: Date.now() - started,
+    });
+    reply(201, { documentId, tipo: parsed.tipo, caracteres: parsed.caracteres, truncado: parsed.truncado, brief });
+  } catch (e) {
+    console.error(JSON.stringify({ severity: 'ERROR', event: 'upload_failed', ip: hashIp(ip), detail: e.message }));
+    fail('error_interno');
+  } finally {
+    slot.release();
+  }
 }
 
 server.listen(port, () => {

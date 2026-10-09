@@ -47,7 +47,7 @@ Es un monolito modular: un solo proceso Node 24 en un solo contenedor sirve las 
 ```mermaid
 flowchart LR
   subgraph nav["Navegador - no confiable"]
-    ui["Interfaz React - tarjetas de sedes, planeado"]
+    ui["Interfaz React - carga y brief; voz y tarjetas planeadas"]
     mic["Captura de micrófono - PCM 16 kHz linear16"]
   end
 
@@ -57,7 +57,7 @@ flowchart LR
     limits["server/limits.mjs - admisión: Origin, cupos y tasa"]
     settings["server/agent-settings.mjs - prompt y mensaje Settings"]
     ips["server/ips.mjs - herramienta buscar_sedes"]
-    docmod["Documento y brief - planeado"]
+    docmod["server/documents.mjs y brief.mjs - texto en memoria y brief"]
     diar["Transcripción diarizada y sentimiento - planeado"]
   end
 
@@ -71,7 +71,9 @@ flowchart LR
   srv --> limits
   srv --> settings
   srv --> ips
-  srv -.-> docmod
+  ui -- "POST /api/document" --> srv
+  srv --> docmod
+  docmod -- "HTTPS brief" --> deepseek
   srv -.-> diar
   srv -- "WSS con Authorization Token" --> deepgram
   deepgram -- "HTTPS" --> deepseek
@@ -82,16 +84,16 @@ flowchart LR
 
 Fuente: `docs/diagrams/contenedores.mmd`.
 
-Lectura de izquierda a derecha: el micrófono del navegador produce PCM de 16 kHz que entra por `/ws/agent` a `server.mjs`. Antes de aceptar la conexión, `server.mjs` consulta a `limits.mjs`. Aceptada la sesión, toma el `Settings` de `agent-settings.mjs`, abre la conexión a Deepgram y queda como relevo en ambos sentidos. Cuando Deepgram pide `buscar_sedes`, `server.mjs` delega en `ips.mjs`, que habla con datos.gov.co. Las líneas punteadas son módulos planeados.
+Lectura de izquierda a derecha: el micrófono del navegador produce PCM de 16 kHz que entra por `/ws/agent` a `server.mjs`. Antes de aceptar la conexión, `server.mjs` consulta a `limits.mjs`. Aceptada la sesión, toma el `Settings` de `agent-settings.mjs`, abre la conexión a Deepgram y queda como relevo en ambos sentidos. Cuando Deepgram pide `buscar_sedes`, `server.mjs` delega en `ips.mjs`, que habla con datos.gov.co. La carga del documento entra por `POST /api/document`: `server.mjs` la pasa a `documents.mjs` (tipo por firma, extracción de texto, almacén en memoria con vencimiento) y a `brief.mjs` (resumen y preguntas con DeepSeek). Las líneas punteadas son módulos planeados.
 
 | Módulo | Archivo | Responsabilidad | Interfaz pública | Estado |
 |---|---|---|---|---|
 | Servidor y proxy de voz | `web/server.mjs` | Arranca Next.js, atiende el upgrade a `/ws/agent`, abre una conexión a Deepgram por sesión, filtra mensajes en ambos sentidos, ejecuta funciones del agente, registra eventos | HTTP en `PORT`; WebSocket `/ws/agent` (ver `docs/api/websocket-protocol.md`) | Construido |
 | Control de admisión | `web/server/limits.mjs` | Lista blanca de Origin, IP del cliente, cupo por IP, cupo global y tasa de conexiones por minuto | `createLimiter({ perIp, global, ratePerMin })` con `admit(ip)` que devuelve `{ ok, release }` o `{ ok: false, status, reason }`; `isAllowedOrigin(origin, allowed)`; `clientIp(req)` | Construido |
-| Configuración del agente | `web/server/agent-settings.mjs` | Prompt de la misión (ADR 0001), modelos de STT, LLM y TTS, formatos de audio, saludo | `buildSettings({ deepseekKey, documentText })`; constantes `IN_RATE` (16000), `OUT_RATE` (24000), `VOICE`, `BASE_PROMPT` | Construido; `documentText` existe pero aún no se usa |
+| Configuración del agente | `web/server/agent-settings.mjs` | Prompt de la misión (ADR 0001), modelos de STT, LLM y TTS, formatos de audio, saludo | `buildSettings({ deepseekKey, documentText })`; constantes `IN_RATE` (16000), `OUT_RATE` (24000), `VOICE`, `BASE_PROMPT` | Construido; el texto del documento va cercado entre `<documento>` y `</documento>` como datos, no instrucciones |
 | Herramienta de sedes | `web/server/ips.mjs` | Valida argumentos, resuelve el municipio contra la lista oficial, construye la consulta SoQL con literales escapados, pagina, agrega por sede | `buscarSedes(args, { token })`; `TOOL_DEFINITION`; `validateArgs`; `resolveMunicipio` | Construido |
-| Páginas y salud | `web/src/app/` | Interfaz web y `GET /api/health` | `GET /`, `GET /api/health` | Salud construida; la interfaz de voz y las tarjetas de sedes están planeadas (hoy `page.tsx` es la plantilla inicial de Next.js) |
-| Documento y brief | por definir | Carga de PDF, DOCX y TXT, extracción de texto, brief y preguntas sugeridas; el texto se pasa a `buildSettings` | `POST /api/document` (planeado, no está en el contrato todavía) | Planeado (paso 3) |
+| Páginas y salud | `web/src/app/` | Interfaz web y `GET /api/health` | `GET /`, `GET /api/health` | Salud, carga de documento y brief construidos (`page.tsx`, `components/DocumentUpload.tsx`); la interfaz de voz y las tarjetas de sedes están planeadas (paso 4) |
+| Documento y brief | `web/server/documents.mjs`, `web/server/brief.mjs` | Tipo real por firma (PDF con unpdf, DOCX leyendo `word/document.xml` con fflate, TXT UTF-8), texto hasta 20 000 caracteres en memoria 30 min, brief de 3 a 5 preguntas con DeepSeek en 25 s como máximo; la sesión de voz recibe el texto con `/ws/agent?doc=<id>` | `POST /api/document`; `parseDocument`, `createDocumentStore`, `generateBrief` | Construido (paso 3) |
 | Transcripción diarizada | por definir | Segunda conexión a Deepgram STT con `diarize=true` para separar Hablante 1 y Hablante 2 | Eventos adicionales por el mismo WebSocket | Planeado (paso 5) |
 | Sentimiento | por definir | Clasificación por intervención con DeepSeek | Eventos adicionales por el mismo WebSocket | Planeado (paso 5) |
 
@@ -278,7 +280,7 @@ Los límites de admisión son por instancia. Con `max-instances` 2 el techo real
 | DTOs de entrada y salida | Implementado | La herramienta devuelve un objeto construido campo a campo desde columnas de la lista blanca; el campo interno `total` se elimina antes de responder |
 | Consultas parametrizadas | Implementado en su equivalente | No hay SQL. La consulta SoQL a datos.gov.co se arma solo con valores de enums y de la lista oficial de municipios, todos escapados con `soqlString`, y codificados con `encodeURIComponent` |
 | Salida codificada sin `innerHTML` | Planeado con la interfaz | La interfaz se escribe en React, que codifica por defecto; regla: sin `dangerouslySetInnerHTML` con datos del agente o del registro |
-| Subidas de archivos | Planeado | RF-001: verificación por firma, 20 MB, sin persistencia en disco |
+| Subidas de archivos | Construido | RF-001: tipo por firma, 20 MB contando bytes reales, nombre del cliente ignorado e id generado (UUID), solo en memoria con vencimiento, Origin en lista blanca, 5 cargas por minuto y 1 simultánea por IP |
 | Anti SSRF | Implementado | Los tres destinos salientes son constantes en el código; ninguna URL sale del usuario o del modelo |
 | Límites de tamaño, paginación y timeouts | Implementado | Frames de 64 KB; buffer previo de 50 frames; sesión de 10 min; datos.gov.co con páginas de 1000 filas, tope de 5000 filas, 20 sedes por respuesta y 8 s por petición |
 | Secretos fuera del código | Implementado | Secret Manager y variables de entorno; `.env` fuera de la imagen y del repositorio; las claves nunca se envían al navegador |
@@ -356,7 +358,8 @@ Las pruebas de carga HTTP miden las páginas y `/api/health`, no sesiones de voz
 - **Tiempo de la herramienta.** Cada petición a datos.gov.co tiene 8 s y la llamada completa a `buscar_sedes` tiene un plazo total de 12 s (`TOOL_DEADLINE_MS` en `server.mjs`); al vencer, el agente recibe `servicio_no_disponible` y lo dice. La conexión con Deepgram tiene un timeout de handshake de 10 s.
 - **Datos del registro.** El dataset no tiene especialidades, EPS, horarios ni disponibilidad, y su corte es de noviembre de 2022 (ADR 0001). El agente lo dice en lugar de inventar.
 - **La clave de DeepSeek se comparte con Deepgram** por diseño de la Voice Agent API.
-- **Funciones planeadas.** Carga de documento y brief, transcripción diarizada, panel de sentimiento e interfaz de voz con tarjetas aún no están construidos.
+- **Documento en una sola instancia.** El texto vive en la memoria de la instancia que recibió la carga; la afinidad de sesión de Cloud Run mantiene la voz en la misma instancia. Si la instancia se recicla, la persona vuelve a subir el documento. Un documento de más de 20 000 caracteres se corta y la interfaz lo avisa.
+- **Funciones planeadas.** Transcripción diarizada, panel de sentimiento e interfaz de voz con tarjetas aún no están construidos.
 
 ## 14. Camino a microservicios
 

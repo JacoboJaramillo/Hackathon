@@ -14,7 +14,7 @@ Para reportar un defecto: título, pasos para reproducir, resultado esperado, re
 
 URL pública: https://agente-vocal-583590264456.us-east1.run.app
 
-Documentos de QA: `docs/REQUIREMENTS.md` (33 requerimientos), `docs/TEST-PLAN.md` (plan) y `docs/TESTING.md` (65 casos y resultados).
+Documentos de QA: `docs/REQUIREMENTS.md` (33 requerimientos), `docs/TEST-PLAN.md` (plan) y `docs/TESTING.md` (71 casos y resultados).
 
 Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
@@ -25,8 +25,8 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 | 0 | Repositorio seguro y secretos en la nube | Hecho |
 | 1 | Prueba del riesgo mayor: agente de voz en español con DeepSeek y la herramienta IPS | Hecho (plan A confirmado) |
 | 2 | Esqueleto desplegado con URL pública | Hecho |
-| 3 | Subida de documento y brief de 3 a 5 preguntas | Siguiente |
-| 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Pendiente |
+| 3 | Subida de documento y brief de 3 a 5 preguntas | Hecho |
+| 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Siguiente |
 | 5 | Transcripción diarizada y panel de sentimiento | Pendiente |
 | 6 | Pulido de UX | Pendiente |
 | 7 | Congelamiento (14:30): auditoría de seguridad, break test, documentación | Pendiente |
@@ -42,6 +42,34 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 ---
 
 ## Entradas
+
+### feat: document upload with brief and document-grounded voice sessions
+Fecha: 2026-10-09, 11:20.
+
+Qué se hizo:
+- La página ya no es la plantilla de Next.js. Muestra el nombre del producto, el aviso "Si es una emergencia, llama al 123", la tarjeta para subir el documento y un espacio reservado para la voz (llega en el paso 4).
+- Nuevo endpoint `POST /api/document` (contrato en `docs/api/openapi.yaml`). Recibe el archivo en bruto, decide el tipo por su firma real (PDF, DOCX o TXT) y no por la extensión, saca el texto y genera con DeepSeek un resumen y de 3 a 5 preguntas sugeridas.
+- El documento no se guarda en disco ni en base de datos: el texto queda en memoria 30 minutos con un id aleatorio. Se guardan como máximo 20 000 caracteres; si hay más, la pantalla avisa.
+- La sesión de voz recibe el documento con `/ws/agent?doc=<id>`. El texto va al agente marcado como datos, para que un documento con órdenes ("ignora tus reglas") no cambie su comportamiento.
+- Controles: Origin permitido, 20 MB como máximo, 5 cargas por minuto y una a la vez por IP.
+- Para DOCX no se usó la librería mammoth porque traía una vulnerabilidad; se lee el XML del documento directamente. PDF usa unpdf.
+
+Cómo probarlo:
+1. Abrir la URL pública, subir un PDF, DOCX o TXT propio. En menos de 30 s aparecen el resumen y de 3 a 5 preguntas.
+2. Subir una imagen renombrada a `.pdf`: debe salir un mensaje claro de tipo no soportado.
+3. Por terminal, con `BASE=https://agente-vocal-583590264456.us-east1.run.app`:
+   - `curl -s -X POST "$BASE/api/document" -H "Origin: $BASE" --data-binary @mi-archivo.txt` responde 201 con `documentId`, `tipo`, `caracteres`, `truncado` y `brief`.
+   - Sin la cabecera Origin responde 403 `origen_no_permitido`.
+   - `curl -s -o /dev/null -w "%{http_code}
+" -X POST "$BASE/api/document" -H "Origin: $BASE" --data-binary ""` responde 400.
+4. Casos detallados: `docs/TESTING.md`, CP-023 a CP-027 y CP-066 a CP-070.
+5. Suite automática (abre 2 sesiones de voz pagadas, correr pocas veces): desde `web/`, `BASE_URL=$BASE ORIGIN=$BASE node --env-file=../.env --test tests/integration/proxy.test.mjs`. Debe dar 12 de 12. Incluye una pregunta hablada sobre un documento con una orden hostil: el agente responde el dato con "según tu documento" y no obedece la orden.
+
+Resultado esperado: 12 de 12 en la suite de integración, 48 pruebas unitarias en verde (`npm test`).
+
+Qué no se puede probar todavía: hablar con el agente desde la página (paso 4); por ahora la voz sobre el documento solo se prueba con la suite automática. CP-028, CP-029 y CP-071 necesitan esa interfaz.
+
+Riesgos conocidos: un PDF escaneado (solo imágenes) no tiene texto y se rechaza con 422, no hay OCR. Si Cloud Run recicla la instancia, el documento se pierde y hay que subirlo otra vez. Un PDF muy grande puede tardar unos segundos en procesarse y en ese tiempo frena un poco las otras sesiones de la misma instancia.
 
 ### feat: architecture docs, CI, reproducible infra and least-privilege build
 Fecha: 2026-10-09, 10:55.
