@@ -43,6 +43,26 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: Gabriela answers only in Spanish; document tests approved in the audio report
+Fecha: 2026-10-09, 15:21.
+
+Qué se hizo:
+- Gabriela habla únicamente en español. Si le hablan o le escriben en otro idioma, o le piden responder en otro idioma, contesta en español y explica que solo atiende en español. El reconocimiento de voz ya estaba fijado en español.
+- Prueba unitaria del prompt y prueba de integración nueva ("Please answer only in English..."): 3 de 3 respuestas en español.
+- Suite de integración completa en local: 18 de 18 pasan.
+- Reporte de pruebas de audio (`docs/PRUEBAS-AUDIO.md` y el `.docx`): las pruebas de documento (V-12) y de preguntas tocadas (V-14) quedan aprobadas con la evidencia de producción de las 15:15. Se agregan V-23 (documento subido durante la conversación) y V-24 (solo español). Total: 24 pruebas, 13 aprobadas.
+
+Cómo probarlo:
+1. Pulsar Hablar y decir o tocar una pregunta en inglés: Gabriela responde en español.
+2. `cd web && npm test`: 75 pasan, 0 fallan.
+3. Con servidor local en el puerto 3100: `BASE_URL=http://localhost:3100 ORIGIN=http://localhost:3100 node --env-file=../.env --test tests/integration/proxy.test.mjs`: 18 de 18.
+
+Resultado esperado: ninguna respuesta en otro idioma.
+
+Qué no se puede probar todavía y por qué: nada pendiente.
+
+Riesgos conocidos: si la persona habla en inglés por voz, el reconocimiento en español puede transcribir mal la frase; Gabriela igual responde en español.
+
 ### feat: Gabriela knows when a document is uploaded and starts the conversation from it (RF-002)
 Fecha: 2026-10-09, 15:11.
 

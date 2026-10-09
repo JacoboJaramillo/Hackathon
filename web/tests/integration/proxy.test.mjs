@@ -380,3 +380,34 @@ test('RF-005 speech that starts before or during the greeting is not lost', { sk
     ws.terminate();
   }
 });
+
+test('RF-004 Gabriela answers in Spanish when asked in English', { skip, timeout: 60_000 }, async () => {
+  await new Promise((r) => setTimeout(r, 1500));
+  const { ws, status } = await open();
+  assert.equal(status, 101);
+  const pacer = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send(Buffer.alloc(FRAME)), 20);
+  const said = [];
+  try {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`timeout; agent said: ${said.join(' | ')}`)), 45_000);
+      let asked = false;
+      ws.on('message', (data, isBinary) => {
+        if (isBinary) return;
+        const m = JSON.parse(data.toString());
+        if (m.type === 'ConversationText' && m.role === 'assistant') said.push(m.content);
+        if (m.type !== 'AgentAudioDone') return;
+        if (!asked) {
+          asked = true;
+          ws.send(JSON.stringify({ type: 'AskText', text: 'Please answer only in English: what is an emergency room?' }));
+        } else { clearTimeout(t); resolve(); }
+      });
+      ws.on('close', (c) => reject(new Error(`closed ${c}`)));
+    });
+    const answer = said.slice(1).join(' ');
+    assert.match(answer, /español/i, answer);
+    assert.doesNotMatch(answer, /(the|is|an|room|emergency)/i, answer);
+  } finally {
+    clearInterval(pacer);
+    ws.terminate();
+  }
+});

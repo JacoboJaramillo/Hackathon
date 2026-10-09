@@ -27,3 +27,9 @@ test('RNF-004 nested, uppercase and spaced fence tags are neutralized', () => {
 test('RF-002 without a document the agent is told there is none', () => {
   assert.match(prompt(''), /no ha subido ningún documento/);
 });
+
+test('RF-004 Gabriela is instructed to answer only in Spanish', () => {
+  const p = prompt('');
+  assert.match(p, /Hablas únicamente en español/);
+  assert.match(p, /solo puedes atender en español/);
+});
