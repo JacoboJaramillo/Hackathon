@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import DocumentUpload, { type ReadyDocument } from "./components/DocumentUpload";
+import VoicePanel, { type SedesResult } from "./components/VoicePanel";
+import SedesPanel from "./components/SedesPanel";
 
 export default function Home() {
-  // The voice step will read documentId to open /ws/agent?doc=<documentId>.
   const [doc, setDoc] = useState<ReadyDocument | null>(null);
+  const [sedes, setSedes] = useState<SedesResult | null>(null);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
@@ -22,17 +24,10 @@ export default function Home() {
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <DocumentUpload onReady={setDoc} />
 
-        {/* Voice panel goes here in the next step; it receives doc?.documentId. */}
-        <section
-          aria-labelledby="voice-title"
-          className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center"
-        >
-          <h2 id="voice-title" className="font-medium text-muted">
-            La conversación por voz aparece aquí
-          </h2>
-          {doc && <p className="mt-2 text-sm text-muted">Tu documento está listo.</p>}
-        </section>
+        <VoicePanel documentId={doc?.documentId ?? null} onSedes={setSedes} />
       </div>
+
+      {sedes && <SedesPanel result={sedes} />}
     </main>
   );
 }

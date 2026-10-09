@@ -26,8 +26,8 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 | 1 | Prueba del riesgo mayor: agente de voz en español con DeepSeek y la herramienta IPS | Hecho (plan A confirmado) |
 | 2 | Esqueleto desplegado con URL pública | Hecho |
 | 3 | Subida de documento y brief de 3 a 5 preguntas | Hecho |
-| 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Siguiente |
-| 5 | Transcripción diarizada y panel de sentimiento | Pendiente |
+| 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Hecho (pruebas del QA pendientes) |
+| 5 | Transcripción diarizada y panel de sentimiento | Siguiente |
 | 6 | Pulido de UX | Pendiente |
 | 7 | Congelamiento (14:30): auditoría de seguridad, break test, documentación | Pendiente |
 | 8 | Despliegue final y ensayo de la demo | Pendiente |
@@ -43,8 +43,33 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: voice panel with live transcript, barge-in and site cards
+Fecha: 2026-10-09, 11:32.
+
+Qué se hizo:
+- La página ya permite hablar con el agente. Botón "Hablar": pide el micrófono, abre la conversación y muestra el estado (Conectando, Te escucho, Pensando, Hablando). "Terminar" la cierra.
+- Si se subió un documento antes de pulsar Hablar, la conversación lo usa.
+- Transcripción en vivo con hora relativa (mm:ss) y quién habla ("Tú" o "Agente"). La separación por voces reales (diarización) llega en el paso 5.
+- Interrupción: si hablas mientras el agente habla, su audio se corta y te escucha.
+- Cuando el agente busca sedes, abajo aparecen tarjetas con nombre, prestador, dirección, teléfono (se puede tocar para llamar), naturaleza, nivel y capacidades. Si buscó en el departamento porque el municipio no tenía, lo dice.
+- Mensajes claros si se niega el micrófono, si la conexión falla, si se corta o si se cumplen los 10 minutos.
+
+Cómo probarlo:
+1. Abrir https://agente-vocal-583590264456.us-east1.run.app en Chrome o Edge, con audífonos para que el agente no se escuche a sí mismo.
+2. Pulsar Hablar y aceptar el micrófono. Esperar el saludo.
+3. Decir: "Necesito urgencias en Leticia". Deben salir las tarjetas de sedes y el agente nombra como máximo tres.
+4. Mientras el agente habla, interrumpir: el audio se corta.
+5. Subir un TXT o PDF, pulsar Terminar y luego Hablar otra vez, y hacer una de las preguntas sugeridas. La respuesta debe decir "según tu documento".
+6. Decir "Mi papá no respira": lo primero debe ser "Llama al 123".
+
+Resultado esperado: estados visibles, transcripción con horas, tarjetas, interrupción funcionando y consola del navegador sin errores.
+
+Qué no se puede probar todavía: diarización real y panel de sentimiento (paso 5). Firefox no está soportado por ahora (el micrófono a 16 kHz solo funciona en Chrome y Edge).
+
+Riesgos conocidos: sin audífonos el eco puede hacer que el agente se interrumpa a sí mismo; el navegador aplica cancelación de eco, pero no es perfecta. El primer clic justo al abrir la página puede no responder si la página aún no terminó de cargar.
+
 ### docs: QA guide entry for step 3 production results (cubre también "test: record step 3 production results for document upload")
-Fecha: 2026-10-09, 11:30.
+Fecha: 2026-10-09, 11:23.
 
 Qué se hizo: se anotaron en `docs/TESTING.md` los resultados del paso 3 contra producción (revisión `agente-vocal-00005`): R-013 a R-015. Quedan Aprobado CP-023, CP-024, CP-026, CP-027, CP-067 y CP-070. El commit anterior de resultados salió sin su entrada; esta la cubre.
 
@@ -57,7 +82,7 @@ Qué no se puede probar todavía: CP-028, CP-029 y CP-071 desde la interfaz (pas
 Riesgos conocidos: ninguno nuevo.
 
 ### feat: document upload with brief and document-grounded voice sessions
-Fecha: 2026-10-09, 11:20.
+Fecha: 2026-10-09, 11:12.
 
 Qué se hizo:
 - La página ya no es la plantilla de Next.js. Muestra el nombre del producto, el aviso "Si es una emergencia, llama al 123", la tarjeta para subir el documento y un espacio reservado para la voz (llega en el paso 4).
