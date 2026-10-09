@@ -100,7 +100,18 @@ Vive en el cierre de la función de cada sesión de voz; no existe un objeto com
 | `maxTimer` | Temporizador de 10 minutos que cierra la sesión con 4000 |
 | `closed` | Evita cerrar dos veces y liberar dos veces el cupo |
 
-La transcripción y los resultados de la herramienta no se acumulan en el servidor: pasan de Deepgram al navegador y quedan solo en la pantalla de la persona. La interfaz de diarización y sentimiento (RF-007, RF-008) está en construcción; añadirá los mensajes `Transcript` y `Sentiment` y este documento se actualizará con sus campos.
+La transcripción y los resultados de la herramienta no se acumulan en el servidor: pasan de Deepgram al navegador y quedan solo en la pantalla de la persona. La diarización y el sentimiento (RF-007, RF-008) siguen la misma regla: el servidor arma las intervenciones en memoria mientras dura la sesión y las envía al navegador sin guardarlas ni registrarlas en logs (solo se registra la cantidad de intervenciones).
+
+| Mensaje | Campo | Tipo | Descripción |
+|---|---|---|---|
+| `Transcript` | `id` | string | Identificador de la intervención dentro de la sesión (`t1`, `t2`...) |
+| `Transcript` | `speaker` | entero | Índice de hablante de Deepgram, desde 0; la interfaz lo muestra como Hablante 1, 2... |
+| `Transcript` | `text` | string | Texto final de la intervención |
+| `Transcript` | `start`, `end` | número | Segundos desde el inicio de la sesión, un decimal |
+| `Sentiment` | `id` | string | El `id` de la intervención que califica |
+| `Sentiment` | `sentimiento` | enum | `positivo`, `neutral` o `negativo` |
+| `Sentiment` | `emocion` | enum | `calma`, `alegria`, `preocupacion`, `miedo`, `enojo`, `tristeza`, `frustracion`, `urgencia` o `confusion` |
+| `Sentiment` | `intensidad` | número | De 0 a 1, dos decimales |
 
 ### 2.4 Resultado de `buscar_sedes` (`web/server/ips.mjs`, contrato en `docs/api/websocket-protocol.md` sección 4.1)
 

@@ -31,7 +31,7 @@ No hay base de datos, cuentas ni datos personales del registro: `gerente` y `ema
 Resumen; el diagrama completo está en `docs/ARCHITECTURE.md` sección 6.
 
 - B1, navegador a servidor: todo input es hostil. Controles antes del handshake (Origin, cupos, tasa) y lista blanca de mensajes.
-- B2, servidor a Deepgram: solo salen `Settings`, audio, `KeepAlive` y `FunctionCallResponse`; solo bajan siete tipos de evento, `ToolResult` y un `Error` saneado. Riesgo aceptado: la clave de DeepSeek viaja en `Settings` a Deepgram.
+- B2, servidor a Deepgram: solo salen `Settings`, audio, `KeepAlive`, `InjectUserMessage` (reconstruido por el servidor a partir de un `AskText` validado: texto de 1 a 300 caracteres, máximo 20 por sesión) y `FunctionCallResponse`; hacia Deepgram STT de diarización sale solo audio, `KeepAlive` y `CloseStream`; solo bajan siete tipos de evento, `ToolResult` y un `Error` saneado. Riesgo aceptado: la clave de DeepSeek viaja en `Settings` a Deepgram.
 - B3, argumentos del modelo a la consulta SoQL: validados y escapados.
 - B4, plano de control de GCP: Secret Manager inyecta las claves como variables de entorno al desplegar.
 
@@ -40,7 +40,7 @@ Resumen; el diagrama completo está en `docs/ARCHITECTURE.md` sección 6.
 | Control exigido | Estado | Dónde |
 |---|---|---|
 | Autorización por objeto y por función | No aplica por decisión (ADR 0004): sin cuentas ni recursos con dueño. Una sesión solo toca su propia conexión; el `documentId` es un UUID aleatorio de uso único dentro de 30 min | `web/server/documents.mjs` (`createDocumentStore`) |
-| Denegar por defecto | Implementado: upgrade a rutas distintas de `/ws/agent` se corta en producción; `ALLOWED_ORIGINS` vacía rechaza todo; texto del cliente solo `KeepAlive` | `web/server.mjs` (`server.on('upgrade')`, `client.on('message')`) |
+| Denegar por defecto | Implementado: upgrade a rutas distintas de `/ws/agent` se corta en producción; `ALLOWED_ORIGINS` vacía rechaza todo; texto del cliente solo `KeepAlive` o `AskText` validado, ambos reconstruidos por el servidor | `web/server.mjs` (`server.on('upgrade')`, `client.on('message')`) |
 | Contraseñas, JWT, MFA | No aplica (sin login) | ADR 0004 |
 | Rate limit | Parcial: tasa por IP (10 por minuto), cupo por IP (2), cupo global (8) en el WebSocket; en `POST /api/document` 5 por minuto, 1 simultánea por IP y 4 globales. Sin bloqueo progresivo ni límite en páginas | `web/server/limits.mjs`, `web/server.mjs` |
 | Validación de esquema | Implementado: argumentos de herramienta (campos desconocidos, tipo, 60 caracteres, caracteres de control, enums); mensajes del cliente por lista blanca; archivos por firma real | `web/server/ips.mjs` (`validateArgs`), `web/server/documents.mjs` (`detectType`) |

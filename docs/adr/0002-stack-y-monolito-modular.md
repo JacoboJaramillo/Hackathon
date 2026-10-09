@@ -34,3 +34,14 @@ Durante el spike se eligió la Voice Agent API de Deepgram, que hace STT, orques
 - Los límites de admisión en memoria no se comparten entre instancias; se acepta con `max-instances` 2.
 - El servidor personalizado desactiva algunas optimizaciones automáticas de Next.js; no afectan a esta aplicación.
 - Se depende de Deepgram para la orquestación del turno: si su Voice Agent API cae, no hay conversación. Se acepta a cambio de no escribir ni operar el pipeline de STT, LLM y TTS.
+
+## Actualización 2026-10-09 (commit 7d80954)
+
+Esta sección reemplaza lo que la sección Decisión dice sobre "módulos planeados" y sobre las dependencias de producción. La decisión de fondo no cambia: un proceso Node con Next.js y `ws`, monolito modular, sin base de datos. Lo que cambió al construir los pasos 3 a 6:
+
+- **Dependencias de producción.** Ya no son solo `next`, `react`, `react-dom` y `ws`. Se agregaron `unpdf` 1.8.1 (texto de PDF) y `fflate` 0.8.3 (descompresión del DOCX para leer `word/document.xml`). Se descartó `mammoth` porque arrastra una dependencia transitiva con una vulnerabilidad conocida; leer `word/document.xml` con `fflate` cubre el texto que necesitamos sin ese riesgo. Ambas dependencias existen en el registro oficial de npm y quedan fijadas por el lockfile.
+- **Módulos del servidor.** A `limits.mjs`, `agent-settings.mjs` e `ips.mjs` se sumaron `documents.mjs` (con `parse-worker.mjs`), `brief.mjs`, `diarize.mjs` y `sentiment.mjs`. Siguen la regla de interfaz explícita: `server.mjs` solo usa sus exports.
+- **Worker thread para documentos.** La extracción de PDF y DOCX corre en un worker desechable con tope de memoria y plazo de 10 s, porque el hilo principal también releva el audio de todas las sesiones de voz.
+- **Segundo upstream por sesión.** Además de la conexión a la Voice Agent API, cada sesión abre un WebSocket al STT de Deepgram con diarización, y llama a DeepSeek por intervención para el sentimiento. Ambos están aislados: si fallan, la voz sigue.
+- **Carga de documento por HTTP.** `POST /api/document` guarda el texto en memoria de la instancia y la sesión de voz lo recibe con `?doc=<id>`. La consecuencia anunciada arriba (afinidad de sesión de Cloud Run) se mantiene y se cumple con la afinidad configurada en el despliegue (ADR 0003).
+- **Estado en memoria.** Además de los contadores de admisión, viven por instancia el almacén de documentos (30 min, máximo 100) y las cachés de `ips.mjs`.

@@ -2,14 +2,19 @@
 // Contract: docs/adr/0001-mision-del-agente.md. The model never writes queries:
 // SoQL literals come only from the official municipio list and the enums below.
 
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+
 const BASE = 'https://www.datos.gov.co/resource/s2ru-bqt6.json';
 const PAGE = 1000;
 const ROW_CAP = 5000;
 const MAX_SEDES = 20;
 const MAX_STR = 60;
+// API try plus snapshot fallback must fit in TOOL_DEADLINE_MS (12 s) in server.mjs.
+const API_BUDGET_MS = 6500;
 
 // gerente and email are personal data and must never be selected.
-const COLUMNS = [
+export const COLUMNS = [
   'departamento', 'municipio', 'c_digo_sede', 'nom_sede_ips', 'nombre_prestador',
   'naturaleza', 'num_nivel_atencion', 'direcci_n', 'tel_fono',
   'nom_grupo_capacidad', 'nom_descripcion_capacidad', 'num_cantidad_capacidad_instalada',
@@ -135,30 +140,61 @@ export function soqlString(s) {
 }
 
 // datos.gov.co answers intermittent 5xx; one quick retry covers most of them.
-async function getJson(url, token, fetchImpl, retries = 1) {
+async function getJson(url, token, fetchImpl, budget, retries = 1) {
+  const timeout = AbortSignal.timeout(8000);
   const res = await fetchImpl(url, {
     headers: token ? { 'X-App-Token': token } : {},
-    signal: AbortSignal.timeout(8000),
+    signal: budget ? AbortSignal.any([timeout, budget]) : timeout,
   });
-  if (res.status >= 500 && retries > 0) return getJson(url, token, fetchImpl, retries - 1);
+  if (res.status >= 500 && retries > 0) return getJson(url, token, fetchImpl, budget, retries - 1);
   if (!res.ok) throw new Error(`datos.gov.co ${res.status}`);
   return res.json();
 }
 
 const q = (params) => '?' + Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
 
+// ponytail: when datos.gov.co fails (intermittent 5xx, 2 to 11 s latency) answers
+// come from a gzipped copy of the whitelisted columns (scripts/snapshot-ips.mjs),
+// loaded once and filtered in memory. Ceiling: the copy is as fresh as its last
+// regeneration; the API stays the primary source.
+let snapshot = null;
+
+function loadSnapshot() {
+  if (!snapshot) {
+    const [header, ...rows] = JSON.parse(gunzipSync(readFileSync(new URL('./data/ips-snapshot.json.gz', import.meta.url))));
+    snapshot = rows.map((r) => Object.fromEntries(header.map((c, i) => [c, r[i]])));
+  }
+  return snapshot;
+}
+
+function snapshotMunicipios() {
+  const seen = new Map();
+  for (const r of loadSnapshot()) {
+    if (r.municipio && r.departamento) seen.set(`${r.municipio}|${r.departamento}`, { municipio: r.municipio, departamento: r.departamento });
+  }
+  return [...seen.values()];
+}
+
+function logFallback(e) {
+  console.warn(JSON.stringify({ severity: 'WARNING', event: 'ips_fallback', reason: e.message }));
+}
+
 let municipiosPromise = null;
 
-export function loadMunicipios({ token, fetchImpl = fetch } = {}) {
+function fetchMunicipios({ token, fetchImpl = fetch, budget } = {}) {
   if (!municipiosPromise) {
     const p = getJson(
       BASE + q({ $select: 'municipio,departamento', $group: 'municipio,departamento', $limit: '5000' }),
-      token, fetchImpl,
+      token, fetchImpl, budget,
     ).then((rows) => rows.filter((r) => r.municipio && r.departamento).map((r) => ({ municipio: r.municipio, departamento: r.departamento })));
     municipiosPromise = p;
     p.catch(() => { if (municipiosPromise === p) municipiosPromise = null; });
   }
   return municipiosPromise;
+}
+
+export function loadMunicipios(opts) {
+  return fetchMunicipios(opts).catch((e) => { logFallback(e); return snapshotMunicipios(); });
 }
 
 // Test hook: the cache is module-level by contract.
@@ -169,21 +205,21 @@ const ROWS_CACHE_MAX = 500;
 
 export function _resetCache() { municipiosPromise = null; rowsCache.clear(); }
 
-async function fetchRows(conds, token, fetchImpl) {
+async function fetchRows(conds, token, fetchImpl, budget) {
   const key = conds.join(' AND ');
   if (rowsCache.has(key)) return rowsCache.get(key);
-  const rows = await fetchRowsUncached(conds, token, fetchImpl);
+  const rows = await fetchRowsUncached(conds, token, fetchImpl, budget);
   if (rowsCache.size >= ROWS_CACHE_MAX) rowsCache.delete(rowsCache.keys().next().value);
   rowsCache.set(key, rows);
   return rows;
 }
 
-async function fetchRowsUncached(conds, token, fetchImpl) {
+async function fetchRowsUncached(conds, token, fetchImpl, budget) {
   const rows = [];
   for (let offset = 0; offset < ROW_CAP; offset += PAGE) {
     const page = await getJson(
       BASE + q({ $select: COLUMNS.join(','), $where: conds.join(' AND '), $order: 'c_digo_sede', $limit: String(PAGE), $offset: String(offset) }),
-      token, fetchImpl,
+      token, fetchImpl, budget,
     );
     rows.push(...page);
     if (page.length < PAGE) break;
@@ -221,31 +257,42 @@ export async function buscarSedes(args, { token, fetchImpl = fetch } = {}) {
   const { necesidad, municipio, departamento, naturaleza } = v.value;
 
   try {
-    const list = await loadMunicipios({ token, fetchImpl });
+    const budget = AbortSignal.timeout(API_BUDGET_MS);
+    let offline = false;
+    const list = await fetchMunicipios({ token, fetchImpl, budget })
+      .catch((e) => { offline = true; logFallback(e); return snapshotMunicipios(); });
     const r = resolveMunicipio(municipio, list, departamento);
     if (!r.match) return { error: 'municipio_no_encontrado', sugerencias: r.suggestions };
+    const { municipio: mun, departamento: dep } = r.match;
+    const caps = NEEDS[necesidad];
+    const group = NEED_GROUPS[necesidad];
 
-    const base = [`nom_descripcion_capacidad in (${NEEDS[necesidad].map(soqlString).join(',')})`];
-    if (NEED_GROUPS[necesidad]) base.push(`nom_grupo_capacidad=${soqlString(NEED_GROUPS[necesidad])}`);
+    const base = [`nom_descripcion_capacidad in (${caps.map(soqlString).join(',')})`];
+    if (group) base.push(`nom_grupo_capacidad=${soqlString(group)}`);
     if (naturaleza) base.push(`naturaleza=${soqlString(naturaleza)}`);
-    const depCond = `departamento=${soqlString(r.match.departamento)}`;
+    base.push(`departamento=${soqlString(dep)}`);
+    const apiRows = (m) => fetchRows(m ? [...base, `municipio=${soqlString(m)}`] : base, token, fetchImpl, budget);
+    const snapRows = async (m) => loadSnapshot().filter((x) => caps.includes(x.nom_descripcion_capacidad)
+      && (!group || x.nom_grupo_capacidad === group) && (!naturaleza || x.naturaleza === naturaleza)
+      && x.departamento === dep && (!m || x.municipio === m));
+    const scoped = async (rowsFor) => {
+      const local = aggregate(await rowsFor(mun));
+      return local.length ? ['municipio', local] : ['departamento', aggregate(await rowsFor(null))];
+    };
 
-    let alcance = 'municipio';
-    let sedes = aggregate(await fetchRows([...base, depCond, `municipio=${soqlString(r.match.municipio)}`], token, fetchImpl));
-    if (sedes.length === 0) {
-      alcance = 'departamento';
-      sedes = aggregate(await fetchRows([...base, depCond], token, fetchImpl));
-    }
+    const [alcance, sedes] = offline
+      ? await scoped(snapRows)
+      : await scoped(apiRows).catch((e) => { logFallback(e); return scoped(snapRows); });
     return {
       alcance,
-      municipio: r.match.municipio,
-      departamento: r.match.departamento,
+      municipio: mun,
+      departamento: dep,
       necesidad,
       total_sedes: sedes.length,
       sedes: sedes.slice(0, MAX_SEDES).map(({ total, ...s }) => s),
     };
   } catch (e) {
-    console.error('buscar_sedes failed:', e.message);
+    console.error(JSON.stringify({ severity: 'ERROR', event: 'buscar_sedes_failed', reason: e.message }));
     return { error: 'servicio_no_disponible' };
   }
 }

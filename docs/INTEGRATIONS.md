@@ -57,11 +57,17 @@ Resumen:
 - Comportamiento ante fallo: error de socket o cierre inesperado cierran la sesión del navegador con 1011 (`upstream_error` o `upstream_closed`), registran el evento y liberan el cupo. Un mensaje `Error` de Deepgram con la sesión abierta se registra como `upstream_error` y al navegador solo llega el texto fijo "El servicio de voz tuvo un problema. Intenta de nuevo."
 - Plan si cae: no hay alternativa de STT ni TTS, por decisión del ADR 0002. La interfaz informa el corte y ofrece volver a intentar. La carga de documento y su brief siguen funcionando porque no dependen de Deepgram.
 
-## 2. Deepgram STT en streaming para diarización (en construcción)
+## 2. Deepgram STT en streaming para diarización
 
-- Propósito: una segunda conexión de reconocimiento de voz con separación de hablantes, para mostrar en la transcripción "Hablante 1", "Hablante 2" y "Agente" con marca de tiempo (RF-007). Hoy la transcripción distingue solo "Tú" y "Agente" a partir de `ConversationText`.
-- Estado: en construcción en el paso 5. Se añaden los mensajes `Transcript` (y `Sentiment`, ver sección 3) al protocolo del WebSocket. Autenticación, timeouts, reintentos y manejo de caídas se documentan aquí cuando la implementación termine; no se describen todavía para no afirmar algo que el código no hace.
-- Restricción de diseño ya fijada: la sesión de voz no puede depender de este módulo; si falla, la conversación continúa sin diarización.
+- Propósito: una segunda conexión de reconocimiento de voz con separación de hablantes, para mostrar en la transcripción "Hablante 1", "Hablante 2" y "Gabriela" con marca de tiempo (RF-007). Código: `web/server/diarize.mjs` (`createDiarizer`, `groupWords`), conectado desde `runSession` en `web/server.mjs`.
+- Dirección y protocolo: WebSocket saliente a `wss://api.deepgram.com/v1/listen` con `model=nova-3`, `language=es`, `diarize=true`, `punctuate`, `smart_format`, `encoding=linear16`, `sample_rate=16000`, `endpointing=300`, `utterance_end_ms=1000` e `interim_results=true` (Deepgram lo exige para `utterance_end_ms`; el código solo usa los resultados finales y el costo es por segundo de audio, no por resultado).
+- Autenticación: `Authorization: Token <DEEPGRAM_API_KEY>`.
+- Datos enviados: el mismo audio PCM del micrófono que va al agente, más `KeepAlive` cada 5 s y `CloseStream` al cerrar.
+- Timeouts: handshake de 10 s. Si Deepgram queda más de 1 MB atrás, se descartan tramas; el audio anterior a que abra esta conexión no se transcribe.
+- Reintentos: ninguno.
+- Fallo: se registra `diarize_error` y se deja de reenviar audio a esta conexión; la sesión de voz sigue igual, solo sin `Transcript` (la interfaz usa entonces el texto de `ConversationText`). El texto de las intervenciones nunca se registra; `diarize_end` solo cuenta intervenciones.
+- Costo: duplica los minutos de transcripción por sesión.
+- Pendiente: con dos voces sintéticas cortas, Deepgram las asignó al mismo hablante; el criterio de 80 % de RF-007 se mide con voces reales.
 
 ## 3. DeepSeek
 
@@ -86,10 +92,15 @@ DeepSeek se usa por dos caminos distintos, con la misma clave (`DEEPSEEK_API_KEY
 - Fallo: cualquier error (red, timeout, HTTP distinto de 200, JSON o forma inválidos) se registra como `brief_failed` con un código (`timeout`, `network`, `http_<n>`, `invalid_json`, `invalid_shape`) y la función devuelve `null`. La carga igual responde 201 con `brief: null`; el documento queda disponible para la voz, pero no cumple RF-003 en esa carga.
 - Plan si cae: la persona puede usar el documento por voz sin brief. No hay modelo alternativo.
 
-### 3.3 Directo desde el servidor: sentimiento por intervención (en construcción)
+### 3.3 Directo desde el servidor: sentimiento por intervención
 
-- Propósito: clasificar el sentimiento de cada intervención para el panel (RF-008), mensaje `Sentiment`.
-- Estado: en construcción en el paso 5. Los detalles de timeout, reintentos y manejo de errores se completan al cerrar el paso; la regla de diseño es que su falla nunca afecta la sesión de voz.
+- Propósito: clasificar cada intervención de una persona para el panel de sentimiento (RF-008), mensaje `Sentiment`. Código: `web/server/sentiment.mjs` (`classifySentiment`), invocado desde `web/server.mjs` cuando el diarizador cierra una intervención de 2 palabras o más.
+- Dirección y protocolo: POST HTTPS a `https://api.deepseek.com/chat/completions`, `deepseek-chat`, `temperature` 0, `max_tokens` 60, `response_format` `json_object`.
+- Autenticación: `Authorization: Bearer <DEEPSEEK_API_KEY>`.
+- Datos enviados: el texto de la intervención entre `<intervencion>` y `</intervencion>`, declarado como dato y no instrucción.
+- Timeout: 4 s. Reintentos: ninguno. Como máximo 2 llamadas en curso por sesión; las intervenciones que exceden ese tope se quedan sin sentimiento en lugar de encolarse, para acotar el costo.
+- Fallo: cualquier error o una respuesta fuera de los enums se registra como `sentiment_failed` con un código corto y no se envía nada; la conversación no se afecta.
+- Latencia medida: de 1,2 a 1,3 s desde que se emite la intervención hasta el `Sentiment` (umbral de RF-008: 2 s).
 
 ## 4. datos.gov.co, dataset de IPS (SODA2, `s2ru-bqt6`)
 
@@ -99,9 +110,9 @@ DeepSeek se usa por dos caminos distintos, con la misma clave (`DEEPSEEK_API_KEY
 - Datos enviados: solo valores de enums de la herramienta y nombres oficiales de municipio y departamento, con comillas escapadas (`soqlString`). Nunca texto libre del usuario o del modelo. Columnas pedidas: lista blanca fija sin `gerente` ni `email`.
 - Volumen: páginas de 1000 filas, tope de 5000 filas, hasta 20 sedes por respuesta. La lista de municipios se descarga una vez por proceso y se guarda en memoria (caché solo de éxitos).
 - Timeouts: 8 s por petición (`AbortSignal.timeout(8000)`) y plazo total de 12 s por llamada a la herramienta (`TOOL_DEADLINE_MS` en `server.mjs`).
-- Reintentos: ninguno. Si la descarga de municipios falla, la caché se descarta y la siguiente llamada vuelve a intentar.
-- Fallo: cualquier error, HTTP distinto de 2xx o vencimiento devuelve `{"error":"servicio_no_disponible"}` al modelo y al navegador, y el prompt obliga al agente a decir que no pudo consultar, sin inventar sedes. `ips.mjs` escribe un `console.error` en texto plano (no JSON) con el mensaje.
-- Plan si cae: sin alternativa en línea. Los datos tienen corte de noviembre de 2022 y cambian poco (ADR 0001), así que una copia local del dataset sería el siguiente paso si el servicio fuera inestable; no está implementada.
+- Reintentos: uno inmediato ante respuestas 5xx. Las consultas exitosas se guardan en memoria (hasta 500) porque el registro es una foto fija, y la lista de municipios se precarga al arrancar el servidor.
+- Fallo: si la API falla se usa la copia local (siguiente punto). Solo si también falla la copia, la herramienta devuelve `{"error":"servicio_no_disponible"}` y el prompt obliga al agente a decir que no pudo consultar, sin inventar sedes; se registra `buscar_sedes_failed` en JSON.
+- Plan si cae: copia local de respaldo. `web/server/data/ips-snapshot.json.gz` (41 427 filas, unos 0,8 MB, solo las columnas de la lista blanca) se genera con `node --env-file-if-exists=../.env scripts/snapshot-ips.mjs` desde `web/`. La API sigue siendo la fuente principal: cada búsqueda tiene un presupuesto de 6,5 s para la API (reintento de 5xx incluido); si falla (5xx, vencimiento o red), `ips.mjs` aplica los mismos filtros sobre la copia en memoria (cargada una vez) y devuelve la misma estructura, con el mismo respaldo municipio y luego departamento. `loadMunicipios` cae también a la lista de la copia. Cada respaldo deja una línea JSON `{"severity":"WARNING","event":"ips_fallback","reason":...}` sin texto del usuario. Los resultados del respaldo no entran en la caché de consultas, así que la siguiente búsqueda vuelve a intentar la API.
 
 ## 5. Google Secret Manager
 

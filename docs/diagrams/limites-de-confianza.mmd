@@ -11,12 +11,14 @@ flowchart LR
     adm["Admisión - limits.mjs"]
     proxy["Proxy de sesión - server.mjs"]
     tool["buscar_sedes - ips.mjs"]
+    docs["Carga de documento - documents.mjs y parse-worker.mjs en worker thread con límites de memoria"]
+    side["Diarización y sentimiento - diarize.mjs y sentiment.mjs, aislados de la voz"]
     env["Claves en memoria del proceso"]
   end
 
   subgraph z3["Zona 3 - terceros con contrato de servicio"]
-    dg["Deepgram - recibe audio y la clave de DeepSeek"]
-    ds["DeepSeek - recibe texto de la conversación"]
+    dg["Deepgram - recibe audio (agente y STT diarizado) y la clave de DeepSeek"]
+    ds["DeepSeek - recibe texto de la conversación, del documento y de cada intervención"]
     dt["datos.gov.co - recibe municipio y tipo de atención"]
   end
 
@@ -31,6 +33,11 @@ flowchart LR
   proxy -- "B2: solo audio y KeepAlive salen hacia arriba" --> dg
   dg -- "B2: solo eventos de la lista blanca bajan" --> proxy
   dg --> ds
+  proxy -- "B2: el mismo audio al segundo upstream v1/listen" --> side
+  side --> dg
+  side -- "B2: texto de la intervención, tratado como datos" --> ds
+  proxy -- "B5: archivo no confiable, tipo por firma, 20 MB" --> docs
+  docs -- "B2: texto del documento cercado como datos" --> ds
   proxy -- "B3: argumentos validados y literales escapados" --> tool
   tool --> dt
   sm -- "B4: inyección al desplegar" --> env

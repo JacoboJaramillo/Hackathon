@@ -22,7 +22,7 @@ Fuera del alcance:
 ## 2. Estrategia
 
 1. Prioridad por riesgo. El mayor riesgo de la demo es que el agente falle en vivo o que un tercero abuse de las claves y del costo. Por eso se cubren primero conversación, honestidad, límites del WebSocket y disponibilidad.
-2. Pirámide corta. Pruebas unitarias de la lógica crítica (traducción de necesidad, resolución de municipio, validaciones, límites), una prueba de integración en vivo, y el resto manual con navegador o con scripts k6.
+2. Pirámide corta. Pruebas unitarias de la lógica crítica (traducción de necesidad, resolución de municipio, validaciones, límites, documentos, brief, diarización, sentimiento; 67 pruebas), 15 pruebas de integración contra el despliegue, y el resto manual con navegador o con scripts k6.
 3. Cada caso referencia un requerimiento y cada requerimiento tiene al menos un caso (trazabilidad en `docs/REQUIREMENTS.md`, columna "Casos").
 4. El QA escribe y ejecuta los casos desde los criterios de aceptación, no desde el código. El desarrollador ejecuta las pruebas automáticas antes de cada commit.
 5. Los números del agente se verifican siempre contra la API de datos.gov.co, no contra el propio agente.

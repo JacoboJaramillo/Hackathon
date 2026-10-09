@@ -3,6 +3,7 @@ sequenceDiagram
   participant N as Navegador
   participant S as Servidor agente-vocal
   participant DG as Deepgram Voice Agent
+  participant DL as Deepgram STT diarizado
   participant DS as DeepSeek
   participant DT as datos.gov.co
 
@@ -10,7 +11,8 @@ sequenceDiagram
   S->>S: Origin en lista blanca, cupo por IP, tasa por minuto y cupo global
   S-->>N: 101 Switching Protocols
   S->>DG: Abre wss agent/converse con Authorization Token
-  S->>DG: Settings con prompt, herramienta y clave de DeepSeek
+  S->>DG: Settings con prompt de Gabriela, herramienta y clave de DeepSeek
+  S->>DL: Abre wss v1/listen con diarize=true
   DG-->>S: Welcome y SettingsApplied
   S-->>N: Welcome y SettingsApplied
   DG-->>S: Audio del saludo 24 kHz
@@ -18,6 +20,7 @@ sequenceDiagram
   loop Cada turno
     N->>S: Frames binarios PCM 16 kHz
     S->>DG: Mismos frames sin modificar
+    S->>DL: Mismos frames, descartados si el socket está atrasado
     DG-->>S: UserStartedSpeaking y ConversationText del usuario
     S-->>N: UserStartedSpeaking y ConversationText
     DG->>DS: chat completions con historial y herramientas
@@ -36,6 +39,16 @@ sequenceDiagram
     S-->>N: Frames binarios de audio
     DG-->>S: AgentAudioDone
     S-->>N: AgentAudioDone
+    DL-->>S: Results finales con palabras y hablante
+    S-->>N: Transcript con id, hablante, texto y tiempos
+    S->>DS: Clasificación de la intervención, máximo 2 en curso
+    DS-->>S: Sentimiento, emoción e intensidad
+    S-->>N: Sentiment con el mismo id
+  end
+  opt Pregunta tocada en la interfaz
+    N->>S: AskText de hasta 300 caracteres
+    S->>DG: InjectUserMessage reescrito por el servidor
   end
   N->>S: Cierre normal o límite de 10 minutos
   S->>DG: terminate
+  S->>DL: CloseStream

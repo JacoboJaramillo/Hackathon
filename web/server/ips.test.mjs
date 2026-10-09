@@ -98,7 +98,7 @@ test('RNF-004 official name with a quote is escaped in the query', async () => {
 test('RF-009 loadMunicipios caches success only', async () => {
   let calls = 0;
   const failing = async () => { calls++; return { ok: false, status: 500 }; };
-  await assert.rejects(loadMunicipios({ fetchImpl: failing }));
+  await quiet(() => loadMunicipios({ fetchImpl: failing }));
   const good = async () => { calls++; return { ok: true, json: async () => LIST }; };
   await loadMunicipios({ fetchImpl: good });
   await loadMunicipios({ fetchImpl: good });
@@ -149,11 +149,58 @@ test('RF-009 errors map to contract codes', async () => {
   const none = await buscarSedes({ necesidad: 'partos', municipio: 'Zzzzxqwk' }, { fetchImpl: fakeFetch(() => []) });
   assert.equal(none.error, 'municipio_no_encontrado');
   assert.ok(none.sugerencias.length > 0);
-  const origErr = console.error;
-  console.error = () => {};
-  const down = await buscarSedes({ necesidad: 'partos', municipio: 'Leticia' }, { token: 'SECRET', fetchImpl: async () => { throw new Error('boom'); } });
-  console.error = origErr;
-  assert.deepEqual(down, { error: 'servicio_no_disponible' });
+});
+
+// Silences the ips_fallback warning and returns what fn resolved to plus the logged lines.
+async function quiet(fn) {
+  const orig = console.warn;
+  const logs = [];
+  console.warn = (l) => logs.push(l);
+  try { return Object.assign(await fn(), { logs }); } finally { console.warn = orig; }
+}
+const down503 = async () => ({ ok: false, status: 503, json: async () => ({}) });
+const downNet = async () => { throw new Error('fetch failed'); };
+
+test('RF-009 API down: urgencias in Leticia comes from the snapshot with the same shape', async () => {
+  for (const fetchImpl of [down503, downNet]) {
+    _resetCache();
+    const r = await quiet(() => buscarSedes({ necesidad: 'urgencias', municipio: 'Leticia' }, { token: 'SECRET', fetchImpl }));
+    assert.deepEqual(Object.keys(r).filter((k) => k !== 'logs'), ['alcance', 'municipio', 'departamento', 'necesidad', 'total_sedes', 'sedes']);
+    assert.equal(r.alcance, 'municipio');
+    assert.equal(r.municipio, 'LETICIA');
+    assert.ok(r.total_sedes >= 1 && r.sedes.length >= 1);
+    assert.deepEqual(Object.keys(r.sedes[0]), ['sede', 'prestador', 'direccion', 'telefono', 'naturaleza', 'nivel', 'capacidades']);
+    assert.ok(r.sedes[0].capacidades.every((c) => NEEDS.urgencias.includes(c.tipo)));
+    assert.equal(r.logs.length, 1);
+    const log = JSON.parse(r.logs[0]);
+    assert.equal(log.severity, 'WARNING');
+    assert.equal(log.event, 'ips_fallback');
+    assert.ok(!r.logs[0].includes('SECRET') && !r.logs[0].includes('Leticia'));
+  }
+});
+
+test('RF-012 API down: departamento fallback works from the snapshot', async () => {
+  const r = await quiet(() => buscarSedes({ necesidad: 'uci_adultos', municipio: 'Puerto Narino' }, { fetchImpl: down503 }));
+  assert.equal(r.municipio, 'PUERTO NARIÑO');
+  assert.equal(r.alcance, 'departamento');
+  assert.ok(r.total_sedes >= 1);
+});
+
+test('RF-009 API fails mid-search: rows come from the snapshot', async () => {
+  const fetchImpl = async (url) => (url.includes('%24group') || url.includes('$group')
+    ? { ok: true, json: async () => [{ municipio: 'LETICIA', departamento: 'Amazonas' }] }
+    : { ok: false, status: 503 });
+  const r = await quiet(() => buscarSedes({ necesidad: 'urgencias', municipio: 'Leticia' }, { fetchImpl }));
+  assert.equal(r.alcance, 'municipio');
+  assert.ok(r.total_sedes >= 1);
+  assert.equal(r.logs.length, 1);
+});
+
+test('RF-009 loadMunicipios falls back to the snapshot list', async () => {
+  const list = await quiet(() => loadMunicipios({ fetchImpl: down503 }));
+  assert.ok(list.length > 1000, String(list.length));
+  assert.ok(list.some((m) => m.municipio === 'LETICIA'));
+  assert.ok(list.every((m) => Object.keys(m).join() === 'municipio,departamento'));
 });
 
 const live = process.env.LIVE === '1';

@@ -43,6 +43,26 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: offline registry fallback so Gabriela always finds sites; docs synced with the code
+Fecha: 2026-10-09, 12:30.
+
+Qué se hizo:
+- datos.gov.co falló con 503 durante las pruebas en producción, incluso con reintento, y tarda entre 2 y 11 s. Para que la demo no dependa de eso, el contenedor trae una copia del registro (`web/server/data/ips-snapshot.json.gz`, 41 427 filas, 0,8 MB, solo columnas permitidas, sin gerentes ni correos).
+- La API sigue siendo la fuente principal, como pide el reto. Cada búsqueda le da 6,5 s; si falla, responde con la copia en unos 15 ms con exactamente la misma estructura. Verificado: urgencias en Leticia (2 sedes), partos en Medellín (8) y diálisis en Pasto (5) dan resultados idénticos por API y por copia.
+- Cada respaldo deja en los logs una línea `ips_fallback`.
+- Documentación al día con el código: `ARCHITECTURE.md` (diagramas con diarización, sentimiento, worker y preguntas tocadas), ADR 0002 (dependencias nuevas), `INTEGRATIONS.md`, `SECURITY.md`, `DATA-MODEL.md`, `TEST-PLAN.md` y resultados R-018 a R-020 en `TESTING.md`.
+
+Cómo probarlo:
+1. Pedir a Gabriela "urgencias en Leticia" varias veces: siempre debe dar sedes, aunque datos.gov.co esté lento.
+2. `cd web && npm test`: 67 pasan, 0 fallan (4 en vivo se saltan); incluye pruebas que simulan la API caída.
+3. Regenerar la copia (solo si hiciera falta): desde `web/`, `node --env-file-if-exists=../.env scripts/snapshot-ips.mjs`.
+
+Resultado esperado: ninguna búsqueda termina en "no pude consultar" por culpa de datos.gov.co.
+
+Qué no se puede probar todavía: nada pendiente.
+
+Riesgos conocidos: si datos.gov.co se cuelga, la respuesta tarda unos 6,6 s más (el presupuesto de la API) antes de usar la copia. La copia es una foto del registro; si el dataset cambiara, hay que regenerarla.
+
 ### fix: keep speech said while connecting so the greeting does not cut the person off
 Fecha: 2026-10-09, 12:27.
 
