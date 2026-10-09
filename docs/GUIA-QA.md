@@ -43,6 +43,28 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### security: audit fixes for uploads and limiter; clearer microphone permission flow
+Fecha: 2026-10-09, 11:50.
+
+Qué se hizo (hallazgos de la auditoría del paso 3 y un problema de uso):
+- Lectura de PDF y DOCX aislada en un hilo aparte con 192 MB de memoria y 10 s como máximo. Antes un archivo pequeño que se descomprime enorme podía congelar o tumbar el servidor y cortar la voz de todos.
+- La subida tiene 20 s en total para llegar; antes un cliente que mandaba un byte cada pocos segundos podía ocupar un cupo hasta una hora.
+- El cerco del documento ya no se rompe con variantes como `</DOCUMENTO>` o etiquetas anidadas.
+- El limitador olvida las IPs sin actividad y en IPv6 cuenta por bloque /64.
+- Contrato: documentados el 405 y el cupo global de cargas.
+- Micrófono: mientras el navegador pide permiso, la página lo dice ("pulsa Permitir en el aviso junto a la barra de direcciones") y se puede cancelar. Si el permiso está bloqueado, explica cómo desbloquearlo.
+
+Cómo probarlo:
+1. Abrir la URL en una ventana de incógnito y pulsar Hablar: debe aparecer el texto que pide pulsar Permitir.
+2. Pulsar Bloquear en el aviso del navegador: debe salir el mensaje de cómo desbloquear el micrófono.
+3. `cd web && npm test`: 52 pasan, 0 fallan (3 en vivo se saltan). Incluye un DOCX y un PDF "bomba" que deben responder 415 sin congelar el servidor.
+
+Resultado esperado: lo anterior, y la suite de integración sigue en 12 de 12.
+
+Qué no se puede probar todavía: diarización y sentimiento (paso 5).
+
+Riesgos conocidos: un PDF hostil todavía consume CPU hasta 10 s en el hilo aparte; la voz no se congela, pero puede ir algo más lenta en ese lapso.
+
 ### feat: voice panel with live transcript, barge-in and site cards
 Fecha: 2026-10-09, 11:32.
 

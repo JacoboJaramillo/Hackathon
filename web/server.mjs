@@ -173,6 +173,7 @@ const JSON_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
 };
+const UPLOAD_BODY_MS = 20_000;
 const UPLOAD_ERRORS = {
   origen_no_permitido: [403, 'No se aceptan cargas desde este sitio.'],
   demasiado_grande: [413, 'El archivo supera 20 MB. Sube uno más pequeño.'],
@@ -194,7 +195,7 @@ async function handleUpload(req, res) {
     req.resume();
   };
   if (req.method !== 'POST') {
-    res.writeHead(405, { ...JSON_HEADERS, Allow: 'POST' });
+    res.writeHead(405, { 'Cache-Control': 'no-store', Allow: 'POST' });
     return res.end();
   }
   const ip = clientIp(req);
@@ -204,7 +205,9 @@ async function handleUpload(req, res) {
   if (!slot.ok) return fail('demasiadas_cargas', { 'Retry-After': '60' });
   const started = Date.now();
   try {
-    req.setTimeout(30_000, () => req.destroy());
+    // Absolute budget for the body: an idle timeout alone lets a client that
+    // trickles one byte at a time hold an upload slot for the whole request.
+    const deadline = setTimeout(() => req.destroy(), UPLOAD_BODY_MS);
     const chunks = [];
     let size = 0;
     for await (const chunk of req) {
@@ -212,6 +215,7 @@ async function handleUpload(req, res) {
       if (size > MAX_BYTES) return fail('demasiado_grande', { Connection: 'close' });
       chunks.push(chunk);
     }
+    clearTimeout(deadline);
     const parsed = await parseDocument(Buffer.concat(chunks));
     if (!parsed.ok) return reply(parsed.status, { error: parsed.error, mensaje: parsed.mensaje });
     const brief = await generateBrief(parsed.text, { apiKey: DEEPSEEK_API_KEY });

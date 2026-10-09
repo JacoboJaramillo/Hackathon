@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { deflateSync } from 'node:zlib';
 import { zipSync, strToU8 } from 'fflate';
 import {
   MAX_BYTES,
@@ -155,4 +156,45 @@ test('RF-003 store rejects non-uuid ids', () => {
   s.put({});
   const ids = [undefined, null, 5, {}, '', 'abc', '../etc/passwd', '00000000-0000-0000-0000-00000000000g'];
   for (const id of ids) assert.equal(s.get(id), null);
+});
+
+// Max gap between 10 ms ticks while fn runs: proves the main event loop stays free.
+async function withLoopGap(fn) {
+  let last = Date.now();
+  let gap = 0;
+  const iv = setInterval(() => {
+    const n = Date.now();
+    gap = Math.max(gap, n - last);
+    last = n;
+  }, 10);
+  const t0 = Date.now();
+  try {
+    return { r: await fn(), ms: Date.now() - t0, gap };
+  } finally {
+    clearInterval(iv);
+  }
+}
+
+test('RNF-004 docx with a 30 MB document.xml is bounded and does not block the event loop', async () => {
+  const xml = `<w:document><w:body>${'<w:p><w:r><w:t>hola mundo</w:t></w:r></w:p>'.repeat(700_000)}</w:body></w:document>`;
+  const bomb = Buffer.from(zipSync({ '[Content_Types].xml': strToU8('<Types/>'), 'word/document.xml': strToU8(xml) }));
+  assert.ok(xml.length > 28e6 && bomb.length < 1e6);
+  const { r, ms, gap } = await withLoopGap(() => parseDocument(bomb));
+  assert.ok(ms < 3000, `took ${ms} ms`);
+  assert.ok(gap < 200, `event loop blocked ${gap} ms`);
+  assert.ok(r.ok ? r.caracteres <= MAX_CHARS : r.status === 415);
+});
+
+test('RNF-004 pdf with a huge FlateDecode stream resolves within the deadline', async () => {
+  const z = deflateSync(Buffer.from('BT /F1 12 Tf (x) Tj ET '.repeat(4_000_000)));
+  const [pre, post] = makePdf('@').toString('latin1').split('@');
+  const pdf = Buffer.concat([
+    Buffer.from(pre.replace('/Length 1 >>', `/Length ${z.length} /Filter /FlateDecode >>`), 'latin1'),
+    z,
+    Buffer.from(post, 'latin1'),
+  ]);
+  const { r, ms, gap } = await withLoopGap(() => parseDocument(pdf));
+  assert.ok(ms < 11_000, `took ${ms} ms`);
+  assert.ok(gap < 200, `event loop blocked ${gap} ms`);
+  assert.ok(r.ok ? r.caracteres <= MAX_CHARS : r.status === 415);
 });

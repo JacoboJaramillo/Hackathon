@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLimiter, isAllowedOrigin, clientIp } from './limits.mjs';
+import { createLimiter, isAllowedOrigin, clientIp, ipKey } from './limits.mjs';
 
 test('RNF-004 per-IP cap rejects the third concurrent session', () => {
   const l = createLimiter({ perIp: 2, global: 10, ratePerMin: 100 });
@@ -49,4 +49,15 @@ test('RNF-004 client IP uses the last X-Forwarded-For entry', () => {
   const req = (xff) => ({ headers: xff ? { 'x-forwarded-for': xff } : {}, socket: { remoteAddress: '9.9.9.9' } });
   assert.equal(clientIp(req('6.6.6.6, 2.2.2.2')), '2.2.2.2');
   assert.equal(clientIp(req()), '9.9.9.9');
+});
+
+test('RNF-004 IPv6 clients are limited per /64 and IPv4 is untouched', () => {
+  assert.equal(ipKey('2001:db8:1:2:aaaa::1'), '2001:db8:1:2::/64');
+  assert.equal(ipKey('2001:0DB8:0001:0002:ffff:1:2:3'), '2001:db8:1:2::/64');
+  assert.equal(ipKey('2001:db8::1'), '2001:db8:0:0::/64');
+  assert.equal(ipKey('203.0.113.7'), '203.0.113.7');
+  assert.equal(ipKey('::ffff:203.0.113.7'), '::ffff:203.0.113.7');
+  const l = createLimiter({ perIp: 1, global: 10, ratePerMin: 10 });
+  assert.equal(l.admit('2001:db8:1:2::a').ok, true);
+  assert.equal(l.admit('2001:db8:1:2::b').reason, 'ip_cap');
 });

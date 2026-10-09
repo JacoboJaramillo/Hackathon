@@ -1,3 +1,4 @@
+import { fenceSafe } from './agent-settings.mjs';
 const URL = 'https://api.deepseek.com/chat/completions';
 const MAX_DOC_CHARS = 12_000;
 
@@ -40,7 +41,7 @@ export async function generateBrief(text, { apiKey, fetchImpl = fetch, timeoutMs
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM },
-          { role: 'user', content: `<documento>\n${String(text).slice(0, MAX_DOC_CHARS).replaceAll('</documento>', '')}\n</documento>` },
+          { role: 'user', content: `<documento>\n${fenceSafe(String(text).slice(0, MAX_DOC_CHARS))}\n</documento>` },
         ],
       }),
       signal: AbortSignal.timeout(timeoutMs),

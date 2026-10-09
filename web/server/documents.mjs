@@ -1,11 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { unzipSync } from 'fflate';
-import { extractText } from 'unpdf';
+import { Worker } from 'node:worker_threads';
 
 export const MAX_BYTES = 20 * 1024 * 1024;
 export const MAX_CHARS = 20_000;
-// Declared uncompressed size allowed for word/document.xml (zip bomb guard).
-const MAX_XML_BYTES = 50 * 1024 * 1024;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -24,31 +21,40 @@ export function detectType(buf) {
   }
 }
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const WORKER_URL = new URL('./parse-worker.mjs', import.meta.url);
+const WORKER_LIMITS = { maxOldGenerationSizeMb: 192, maxYoungGenerationSizeMb: 32 };
+const WORKER_DEADLINE_MS = 10_000;
 
-function docxText(buf) {
-  const files = unzipSync(new Uint8Array(buf), {
-    filter: (f) => f.name === 'word/document.xml' && f.originalSize <= MAX_XML_BYTES,
+// PDF and DOCX parsing runs in a throwaway worker so a decompression bomb cannot
+// block the event loop (live voice relays share it) or exhaust the instance memory.
+function extractInWorker(tipo, buf) {
+  return new Promise((resolve, reject) => {
+    const u8 = new Uint8Array(buf);
+    // Copy into a standalone ArrayBuffer so transferring never detaches a pooled Buffer.
+    const copy = u8.slice();
+    const worker = new Worker(WORKER_URL, {
+      workerData: { tipo, buf: copy },
+      transferList: [copy.buffer],
+      resourceLimits: WORKER_LIMITS,
+    });
+    const timer = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('timeout'));
+    }, WORKER_DEADLINE_MS);
+    const done = (fn, v) => {
+      clearTimeout(timer);
+      worker.terminate();
+      fn(v);
+    };
+    worker.once('message', (m) => (m.error ? done(reject, new Error(m.error)) : done(resolve, m.text)));
+    worker.once('error', (e) => done(reject, e));
+    worker.once('exit', (code) => done(reject, new Error(`worker exit ${code}`)));
   });
-  const xml = files['word/document.xml'];
-  if (!xml) throw new Error('no document.xml');
-  return new TextDecoder()
-    .decode(xml)
-    .replace(/<w:tab\s*\/>/g, '\t')
-    .replace(/<w:(?:br|cr)\s*\/>|<\/w:p>/g, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos));/gi, (_, d, h, n) =>
-      n ? ENTITIES[n.toLowerCase()] : String.fromCodePoint(d ? +d : parseInt(h, 16)),
-    );
 }
 
 async function extract(tipo, buf) {
-  if (tipo === 'pdf') {
-    const { text } = await extractText(new Uint8Array(buf), { mergePages: true });
-    return text;
-  }
-  if (tipo === 'docx') return docxText(buf);
-  return utf8.decode(buf);
+  if (tipo === 'txt') return utf8.decode(buf);
+  return extractInWorker(tipo, buf);
 }
 
 function normalize(s) {
@@ -77,8 +83,6 @@ export async function parseDocument(buf) {
   if (!tipo) return unsupported;
   let raw;
   try {
-    // ponytail: no decompression cap for DOCX beyond the 20 MB input cap and the
-    // declared size of document.xml; stream with a hard limit if inputs become untrusted at scale.
     raw = await extract(tipo, buf);
   } catch {
     return unsupported;

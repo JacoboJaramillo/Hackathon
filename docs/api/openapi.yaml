@@ -79,7 +79,8 @@ paths:
         igual se acepta y `brief` es null: la persona puede hablar del documento.
 
         Controles: Origin en ALLOWED_ORIGINS (403), 5 cargas por minuto y 1
-        simultánea por IP (429), 20 MB como máximo (413).
+        simultánea por IP (429), 20 MB como máximo (413) y 20 s como máximo para
+        recibir el cuerpo completo (la conexión se corta si se excede).
       x-requirement: [RF-001, RF-003, RNF-004]
       parameters:
         - name: Origin
@@ -124,6 +125,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "405":
+          description: Método distinto de POST. Cuerpo vacío y cabecera Allow con POST.
+          headers:
+            Allow:
+              schema:
+                type: string
+                const: POST
         "413":
           description: Más de 20 MB (demasiado_grande).
           content:
@@ -140,7 +148,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "429":
-          description: Más de 5 cargas por minuto o una carga en curso desde la IP (demasiadas_cargas).
+          description: |
+            Más de 5 cargas por minuto o una carga en curso desde la IP, o la
+            instancia ya procesa 4 cargas (demasiadas_cargas). En IPv6 el límite
+            se cuenta por prefijo /64.
           headers:
             Retry-After:
               schema:

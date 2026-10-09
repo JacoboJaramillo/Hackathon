@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 const IN_RATE = 16000;
 const OUT_RATE = 24000;
 
-type Status = "idle" | "connecting" | "listening" | "thinking" | "speaking";
+type Status = "idle" | "permission" | "connecting" | "listening" | "thinking" | "speaking";
 type Line = { role: "user" | "assistant"; content: string; at: number };
 
 export type Sede = {
@@ -32,6 +32,7 @@ export type SedesResult = {
 
 const STATUS_TEXT: Record<Status, string> = {
   idle: "Listo para hablar",
+  permission: "Esperando el micrófono",
   connecting: "Conectando...",
   listening: "Te escucho",
   thinking: "Pensando...",
@@ -54,6 +55,7 @@ export default function VoicePanel({
   const [lines, setLines] = useState<Line[]>([]);
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
+  const cancelledRef = useRef(false);
   const logRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => () => stopRef.current?.(), []);
@@ -64,7 +66,8 @@ export default function VoicePanel({
   async function start() {
     setError(null);
     setLines([]);
-    setStatus("connecting");
+    setStatus("permission");
+    cancelledRef.current = false;
     // Both contexts are created inside the click so the browser lets them play.
     // ponytail: a 16 kHz context fed by the mic works in Chrome and Edge; Firefox
     // needs an in-worklet resampler if it must be supported.
@@ -76,13 +79,28 @@ export default function VoicePanel({
         audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
       });
       await mic.audioWorklet.addModule("/pcm-capture.js");
-    } catch {
+    } catch (e) {
       void mic.close();
       void out.close();
+      if (cancelledRef.current) return;
       setStatus("idle");
-      setError("Necesito permiso para usar tu micrófono. Actívalo en el navegador e intenta de nuevo.");
+      const name = e instanceof DOMException ? e.name : "";
+      setError(
+        name === "NotAllowedError"
+          ? "El micrófono está bloqueado para esta página. Pulsa el ícono a la izquierda de la dirección, en Micrófono elige Permitir y vuelve a pulsar Hablar."
+          : name === "NotFoundError"
+            ? "No encontré un micrófono conectado."
+            : "No pude abrir el micrófono. Intenta de nuevo.",
+      );
       return;
     }
+    if (cancelledRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      void mic.close();
+      void out.close();
+      return;
+    }
+    setStatus("connecting");
 
     const node = new AudioWorkletNode(mic, "pcm-capture");
     mic.createMediaStreamSource(stream).connect(node);
@@ -225,14 +243,25 @@ export default function VoicePanel({
 
       <button
         type="button"
-        onClick={() => (active ? stopRef.current?.() : void start())}
-        disabled={status === "connecting"}
+        onClick={() => {
+          if (!active) return void start();
+          if (stopRef.current) return stopRef.current();
+          // Still waiting for the permission prompt: abandon this attempt.
+          cancelledRef.current = true;
+          setStatus("idle");
+        }}
         className={`mt-4 rounded-xl px-4 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60 ${
           active ? "bg-danger" : "bg-accent"
         }`}
       >
         {active ? "Terminar" : "Hablar"}
       </button>
+
+      {status === "permission" && (
+        <p className="mt-3 text-sm font-medium">
+          Tu navegador te está pidiendo permiso para usar el micrófono: pulsa Permitir en el aviso junto a la barra de direcciones.
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="mt-3 text-sm text-danger">
