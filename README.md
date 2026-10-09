@@ -1,6 +1,6 @@
 # ¿Dónde me atienden?
 
-Agente de voz cognitivo del Reto 01 de Kognia Labs. Una persona abre la página, habla en español con la asistente "Gabriela" y le dice qué atención necesita y en qué municipio está; Gabriela consulta en vivo el registro oficial de IPS de datos.gov.co (dataset `s2ru-bqt6`) y le indica en qué sede puede atenderse. Si la persona sube un documento (PDF, DOCX o TXT), el agente también responde sobre él sin inventar y cita "según tu documento". La transcripción diarizada y el panel de sentimiento están en construcción (paso 5).
+Agente de voz cognitivo del Reto 01 de Kognia Labs. Una persona abre la página, habla en español con la asistente "Gabriela" y le dice qué atención necesita y en qué municipio está; Gabriela consulta en vivo el registro oficial de IPS de datos.gov.co (dataset `s2ru-bqt6`) y le indica en qué sede puede atenderse. Si la persona sube un documento (PDF, DOCX o TXT), el agente también responde sobre él sin inventar y cita "según tu documento". La pantalla muestra la transcripción con hablantes y hora, y el sentimiento y la emoción de cada intervención. Si la persona quiere, Gabriela le envía hasta tres sedes por WhatsApp.
 
 URL pública: https://agente-vocal-583590264456.us-east1.run.app (sin cuentas ni instalación; Chrome o Edge con micrófono, Firefox no está soportado).
 
@@ -21,6 +21,12 @@ URL pública: https://agente-vocal-583590264456.us-east1.run.app (sin cuentas ni
 5. `POST /api/document` identifica el tipo por firma, extrae el texto en un hilo aislado, lo guarda 30 minutos en memoria y genera un brief con DeepSeek.
 
 Detalle, diagramas y límites de confianza: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Arquitectura en imágenes
+
+![Vista general del sistema](docs/diagrams/img/01-contexto.png)
+
+De izquierda a derecha: la persona habla con Gabriela en el navegador, que se conecta por HTTPS y WSS al servicio `agente-vocal` en Cloud Run; el servidor, con claves que solo él conoce, habla con Deepgram, DeepSeek, datos.gov.co y (opcional) WhatsApp. Los seis diagramas (contexto, módulos, flujo de voz, despliegue, seguridad y WhatsApp) están en [docs/ARQUITECTURA-VISUAL.md](docs/ARQUITECTURA-VISUAL.md).
 
 ## Decisiones clave
 

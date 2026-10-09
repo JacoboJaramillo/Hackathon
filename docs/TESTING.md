@@ -74,8 +74,8 @@ Los archivos de prueba (`corto.pdf`, `corto.docx`, `corto.txt`, `escaneado.pdf`,
 
 | ID | Req. | Tipo | Precondiciones | Pasos | Resultado esperado | Estado |
 |---|---|---|---|---|---|---|
-| CP-030 | RF-004 | E2E | Micrófono real, Chrome | Hacer 10 preguntas; medir fin de voz a primer audio con cronómetro y registros | p50 de 2,0 s o menos (objetivo 1,5 s); anotar p95 | Pendiente |
-| CP-031 | RF-005 | E2E | Agente hablando una respuesta larga | Hablar encima | El audio se corta en 300 ms o menos y el agente atiende la nueva pregunta | Pendiente |
+| CP-030 | RF-004 | E2E | Micrófono real, Chrome | Hacer 10 preguntas; medir fin de voz a primer audio con cronómetro y registros | p50 de 2,0 s o menos (objetivo 1,5 s); anotar p95 | Aprobado (13:45, ver R-022; falta repetir con micrófono real) |
+| CP-031 | RF-005 | E2E | Agente hablando una respuesta larga | Hablar encima | El audio se corta en 300 ms o menos y el agente atiende la nueva pregunta | Fallido (13:55, ver R-023) |
 | CP-032 | RF-007 | E2E | Dos voces distintas | Conversar alternando voces | Hablantes separados (Hablante 1, Hablante 2, Agente) con marca de tiempo; al menos 80 % correctos | Pendiente |
 | CP-033 | RF-008 | E2E | Intervenciones con tono claramente distinto | Decir una frase molesta y una amable | El panel muestra sentimiento por intervención y tendencia en 2 s o menos | Aprobado (12:20, ver R-018) |
 
@@ -208,7 +208,7 @@ Marcar cada punto al ejecutarlo y registrar defectos en la sección 15.
 ## 14. Cobertura
 
 - Requerimientos: 34 (RF-001 a RF-024 y RNF-001 a RNF-010).
-- Casos de prueba: 85 (CP-001 a CP-085); 30 Aprobado, 55 Pendiente (CP-066 a CP-071 cubren la carga de documento y `?doc=`; CP-074 a CP-085 cubren RF-024).
+- Casos de prueba: 85 (CP-001 a CP-085); 31 Aprobado, 1 Fallido, 53 Pendiente (CP-066 a CP-071 cubren la carga de documento y `?doc=`; CP-074 a CP-085 cubren RF-024).
 - Verificación: cada caso referencia al menos un requerimiento existente y cada requerimiento aparece en al menos un caso (columna "Casos" de `docs/REQUIREMENTS.md`). Revisar de nuevo antes de la entrega si se agregan casos o requerimientos.
 
 ## 15. Resultados
@@ -238,3 +238,5 @@ Una fila por ejecución. Las cuatro primeras ya están verificadas.
 | R-019 | CP-037 | 2026-10-09 12:20 | 7d80954, producción | Desarrollador | Aprobado | `GET /api/health` 200 en 428 ms dentro de la suite de integración (umbral 500 ms) |
 | R-020 | CP-031 (parcial) | 2026-10-09 12:30 | 7cf1539, local | Desarrollador | Aprobado por suite automática | Voz enviada desde el primer instante, encima del saludo: el agente la transcribió ("urgencias") y la atendió. La medición de corte en 300 ms o menos queda para el QA con micrófono real |
 | R-021 | CP-074 a CP-077 | 2026-10-09 13:05 | local, sin commit | Desarrollador | Aprobado por suite automática | `node --test server/*.test.mjs`: 74 pasan, 0 fallan (7 nuevas de WhatsApp). Prueba de voz local: tras listar sedes, Gabriela cerró con "Si quieres, te las envío por WhatsApp". El envío real queda pendiente de la aprobación de la plantilla por Meta |
+| R-022 | CP-030 | 2026-10-09 13:45 | b7507a9, revisión agente-vocal-00011 | Desarrollador | Aprobado (automático) | Producción, 16 turnos sin herramienta en dos sesiones, voz sintética enviada en tiempo real y medida desde la última muestra con voz hasta el primer byte de audio del agente: p50 2,0 s, p90 2,1 s, mínimo 1,97 s, máximo 3,7 s (un turno). Desglose: unos 0,5 s hasta la transcripción final y unos 1,5 s de DeepSeek más el arranque de la voz. Cumple el umbral de 2,0 s justo en el límite; el objetivo de 1,5 s no se alcanza |
+| R-023 | CP-031 | 2026-10-09 13:55 | b7507a9, revisión agente-vocal-00011 | Desarrollador | Fallido frente al umbral | Producción, 6 interrupciones con el agente hablando: del inicio de la voz del usuario al evento `UserStartedSpeaking` 1,07 a 1,11 s (p50 1,09 s). El navegador descarta el audio en cola en cuanto llega el evento, así que el corte percibido es de unos 1,1 s, por encima de los 300 ms del criterio. El agente sí atendió la nueva frase en los 6 casos. La espera es la detección de voz de Deepgram más la red; mejora posible: detección local de voz en el navegador para bajar el volumen del agente al instante |

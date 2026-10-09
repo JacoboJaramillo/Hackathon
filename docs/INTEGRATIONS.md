@@ -41,10 +41,10 @@ Resumen:
 | Integración | Dirección | Protocolo | Autenticación | Timeout | Reintentos |
 |---|---|---|---|---|---|
 | Deepgram Voice Agent | Servidor a Deepgram | WSS | `Authorization: Token <clave>` | Handshake 10 s; sesión máxima 10 min | Ninguno |
-| Deepgram STT en streaming (diarización) | Servidor a Deepgram | WSS | Por definir | Por definir | En construcción |
+| Deepgram STT en streaming (diarización) | Servidor a Deepgram | WSS | `Authorization: Token <clave>` | Handshake 10 s; KeepAlive cada 5 s | Ninguno: si cae, solo se pierde el panel |
 | DeepSeek vía Deepgram | Deepgram a DeepSeek | HTTPS | Clave de DeepSeek entregada en `Settings` | Lo impone Deepgram | Lo decide Deepgram |
 | DeepSeek directo (brief) | Servidor a DeepSeek | HTTPS | `Authorization: Bearer <clave>` | 25 s | Ninguno |
-| DeepSeek directo (sentimiento) | Servidor a DeepSeek | HTTPS | Igual que el brief | Por definir | En construcción |
+| DeepSeek directo (sentimiento) | Servidor a DeepSeek | HTTPS | Igual que el brief | 4 s por intervención | Ninguno: la intervención queda sin etiqueta |
 | datos.gov.co | Servidor a datos.gov.co | HTTPS | `X-App-Token` opcional | 8 s por petición, 12 s por llamada | Ninguno |
 | WhatsApp Cloud API (opcional) | Servidor a Meta | HTTPS | `Authorization: Bearer <WHATSAPP_ACCESS_TOKEN>` | 8 s | Ninguno |
 | Secret Manager | Cloud Run a Secret Manager | API de GCP, al desplegar | Identidad `agente-vocal-run` | No aplica | No aplica |

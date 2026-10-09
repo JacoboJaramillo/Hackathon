@@ -43,8 +43,31 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: deliverables (architecture and DevOps, audio test report), architecture diagrams, measured latency and barge-in
+Fecha: 2026-10-09, 14:40.
+
+Qué se hizo:
+- Dos documentos Word en blanco y negro en `docs/entregables/`, presentados por Daniel Fajardo y Jacobo Jaramillo en representación de Solutions Tech Web SAS:
+  - `Arquitectura-y-DevOps.docx`: arquitectura, stack, APIs, integraciones, datos, seguridad, DevOps, capacidad, pruebas y riesgos.
+  - `Reporte-Pruebas-Audio.docx`: 22 pruebas de audio en formato checklist con su estado real (9 aprobadas, 5 parciales, 2 intermitentes, 1 fallida, 5 pendientes).
+  - Se regeneran con `python docs/entregables/build_arquitectura.py` y `python docs/entregables/build_pruebas_audio.py`.
+- Seis diagramas de arquitectura generados por código (librería `diagrams` sobre Graphviz) en `docs/diagrams/img/`, con su página `docs/ARQUITECTURA-VISUAL.md` y la sección "Arquitectura en imágenes" del README. Fuente: `docs/diagrams/code/build.py`.
+- Latencia medida en producción (R-022): p50 2,0 s y p90 2,1 s sobre 16 turnos, desde el fin de la voz hasta el primer audio de Gabriela. Cumple el umbral de 2,0 s justo en el límite.
+- Interrupción medida en producción (R-023): 1,09 s (p50, 6 de 6) desde que la persona empieza a hablar hasta que el agente se corta. No cumple el umbral de 300 ms de RF-005; CP-031 queda Fallido. El agente sí atiende la nueva frase.
+- Correcciones: el README ya no dice que la transcripción y el sentimiento están en construcción, `INTEGRATIONS.md` tiene los timeouts reales de diarización y sentimiento, y la hora de la entrada del rediseño se corrigió a 13:37.
+
+Cómo probarlo:
+1. Abrir los dos `.docx` en Word, pulsar F9 sobre el índice del documento de arquitectura para actualizarlo y revisar portada, secciones y figuras.
+2. Abrir `docs/ARQUITECTURA-VISUAL.md` en GitHub: deben verse las 6 imágenes y el diagrama de secuencia.
+3. Medir la latencia a mano con micrófono real (CP-030): 10 preguntas cortas y cronómetro desde que terminas de hablar hasta que suena Gabriela. Esperado: unos 2 s.
+4. Interrumpir a Gabriela mientras habla (CP-031): esperado, se calla en cerca de un segundo y atiende lo nuevo.
+
+Qué no se puede probar todavía y por qué: el número de páginas de los `.docx` no se verificó porque no hay Word por línea de comandos en la máquina.
+
+Riesgos conocidos: la interrupción es más lenta que el criterio; mejora posible con detección local de voz en el navegador, no implementada por el congelamiento.
+
 ### feat: redesigned interface with a voice waveform and a clear hierarchy
-Fecha: 2026-10-09, 13:50.
+Fecha: 2026-10-09, 13:37.
 
 Qué se hizo:
 - Rediseño completo de la interfaz para que se vea como un producto cuidado y no como una página generada por IA. Se aplicaron las reglas de la skill frontend-design de Anthropic y de impeccable.style: sin gradientes, sin orbe, sin antetítulo en mayúsculas y sin tarjetas iguales.
