@@ -42,7 +42,7 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 | RNF-004 | Seguridad del WebSocket y abuso | Alta | `/ws/agent` rechaza: Origin fuera de la lista blanca, tercera sesión simultánea desde una misma IP (máximo 2), conexiones sobre el límite por IP, sesiones sobre el tope global, mensajes sobre el tamaño máximo, tipos de mensaje desconocidos. La sesión se cierra al superar la duración máxima. Una sesión nunca accede a datos de otra. La consulta al registro no es inyectable y un documento con instrucciones hostiles no cambia las reglas del agente | CLAUDE.md sec. 4 | CP-029, CP-041 a CP-048, CP-057, CP-067, CP-068, CP-070 |
 | RNF-005 | Cabeceras de seguridad | Alta | Toda respuesta HTML incluye HSTS, CSP en modo report-only, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` y `Permissions-Policy` con micrófono solo para `self` | CLAUDE.md sec. 4 | CP-049 a CP-051 |
 | RNF-006 | Secretos y exposición | Alta | Las claves viven solo en el servidor (Secret Manager) y no aparecen en el bundle del cliente. `/.env`, `/.git/config` y los source maps no responden 200. Los errores al cliente son genéricos, sin trazas. `.env` no está versionado y gitleaks no reporta hallazgos | CLAUDE.md sec. 4 | CP-002, CP-052 a CP-056 |
-| RNF-007 | Rendimiento y carga | Alta | Smoke: p95 menor a 800 ms. Carga con 20 VUs: p95 menor a 1000 ms y errores menores a 1 %. Estrés (hasta 150 VUs): p95 menor a 3000 ms y errores menores a 5 %, con recuperación tras bajar la carga. Picos (120 VUs): errores menores a 5 %. Los límites del WebSocket rechazan el 100 % de los intentos excedentes | Plan de pruebas | CP-058 a CP-062 |
+| RNF-007 | Rendimiento y carga | Alta | Smoke: p95 menor a 800 ms. Carga con 20 VUs: p95 menor a 1000 ms y errores menores a 1 %. Estrés (hasta 150 VUs): p95 menor a 3000 ms y errores menores a 5 %, con recuperación tras bajar la carga. Picos (120 VUs): errores menores a 5 %. Los límites del WebSocket rechazan el 100 % de los intentos excedentes | Plan de pruebas | CP-058 a CP-062, CP-072, CP-073 |
 | RNF-008 | README de una página | Media | Contiene stack, arquitectura, decisiones, variables de entorno, cómo correr pruebas y qué se generó con IA. Un tercero levanta el proyecto en menos de 15 min siguiendo solo el README | E03, M04 | CP-039 |
 | RNF-009 | Dependencias y repositorio limpios | Alta | `npm audit --omit=dev` con 0 vulnerabilidades. gitleaks sin hallazgos en lo versionado. Lockfile presente y `npm ci` exitoso | CLAUDE.md sec. 4 | CP-003, CP-064, CP-065 |
 | RNF-010 | Regresión automatizada | Media | `node --test` en `web/server/*.test.mjs` con 0 fallos antes de cada despliegue y de cada merge | CLAUDE.md sec. 7 | CP-063 |
@@ -50,7 +50,7 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 ## 3. Verificación de cobertura
 
 - Requerimientos: 23 funcionales (RF-001 a RF-023) y 10 no funcionales (RNF-001 a RNF-010), 33 en total.
-- Casos de prueba en `docs/TESTING.md`: 65 (CP-001 a CP-065).
+- Casos de prueba en `docs/TESTING.md`: 73 (CP-001 a CP-073).
 - Todo requerimiento tiene al menos un caso (columna "Casos") y todo caso apunta a un requerimiento existente. La matriz se revisa antes de la entrega.
 
 ## 4. Supuestos y pendientes

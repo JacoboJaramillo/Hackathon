@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Protocol: docs/api/websocket-protocol.md. Microphone goes up as 16 kHz PCM,
 // agent audio comes down as 24 kHz PCM.
 const IN_RATE = 16000;
 const OUT_RATE = 24000;
 
-type Status = "idle" | "permission" | "connecting" | "listening" | "thinking" | "speaking";
-type Line = { role: "user" | "assistant"; content: string; at: number };
+export type Status = "idle" | "permission" | "connecting" | "listening" | "thinking" | "speaking";
 
 export type Sede = {
   sede: string | null;
@@ -30,46 +29,57 @@ export type SedesResult = {
   sugerencias?: string[];
 };
 
-const STATUS_TEXT: Record<Status, string> = {
-  idle: "Listo para hablar",
-  permission: "Esperando el micrófono",
-  connecting: "Conectando...",
-  listening: "Te escucho",
-  thinking: "Pensando...",
-  speaking: "Hablando",
+export type Sentiment = {
+  sentimiento: "positivo" | "neutral" | "negativo";
+  emocion: string;
+  intensidad: number;
 };
 
-const clock = (ms: number) => {
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+// speaker: Deepgram speaker index for people, null for Gabriela.
+export type Turn = {
+  id: string;
+  speaker: number | null;
+  text: string;
+  at: number;
+  sentiment?: Sentiment;
 };
 
-export default function VoicePanel({
-  documentId,
-  onSedes,
-}: {
-  documentId: string | null;
-  onSedes: (result: SedesResult) => void;
-}) {
+type Message = {
+  type?: string;
+  role?: string;
+  content?: string;
+  message?: string;
+  result?: SedesResult;
+  id?: string;
+  speaker?: number;
+  text?: string;
+  start?: number;
+} & Partial<Sentiment>;
+
+function rms(analyser: AnalyserNode, buf: Float32Array<ArrayBuffer>) {
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+}
+
+export function useVoiceSession(documentId: string | null, onSedes: (r: SedesResult) => void) {
   const [status, setStatus] = useState<Status>("idle");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const cancelledRef = useRef(false);
-  // The server-rendered button is inert until React hydrates; a click before
-  // that would be lost silently, so it stays disabled until then.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
-  const logRef = useRef<HTMLOListElement>(null);
+  // Read by the orb animation every frame; returns 0..1.
+  const levelRef = useRef<() => number>(() => 0);
+  const askRef = useRef<((text: string) => void) | null>(null);
+  // A question tapped before the session is ready waits for SettingsApplied.
+  const pendingAskRef = useRef<string | null>(null);
 
   useEffect(() => () => stopRef.current?.(), []);
-  useEffect(() => {
-    logRef.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
-  }, [lines]);
 
-  async function start() {
+  const start = useCallback(async () => {
     setError(null);
-    setLines([]);
+    setTurns([]);
     setStatus("permission");
     cancelledRef.current = false;
     // Both contexts are created inside the click so the browser lets them play.
@@ -86,6 +96,7 @@ export default function VoicePanel({
     } catch (e) {
       void mic.close();
       void out.close();
+      pendingAskRef.current = null;
       if (cancelledRef.current) return;
       setStatus("idle");
       const name = e instanceof DOMException ? e.name : "";
@@ -107,17 +118,44 @@ export default function VoicePanel({
     setStatus("connecting");
 
     const node = new AudioWorkletNode(mic, "pcm-capture");
-    mic.createMediaStreamSource(stream).connect(node);
+    const source = mic.createMediaStreamSource(stream);
+    source.connect(node);
+    const micAnalyser = mic.createAnalyser();
+    micAnalyser.fftSize = 512;
+    source.connect(micAnalyser);
+    const outAnalyser = out.createAnalyser();
+    outAnalyser.fftSize = 512;
+    outAnalyser.connect(out.destination);
+    const micBuf = new Float32Array(micAnalyser.fftSize);
+    const outBuf = new Float32Array(outAnalyser.fftSize);
+
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const query = documentId ? `?doc=${encodeURIComponent(documentId)}` : "";
     const ws = new WebSocket(`${proto}://${location.host}/ws/agent${query}`);
     ws.binaryType = "arraybuffer";
+    let ready = false;
+    const askedTexts = new Set<string>();
+    const sendAsk = (text: string) => {
+      ws.send(JSON.stringify({ type: "AskText", text }));
+      askedTexts.add(text);
+      const turn: Turn = { id: `q${Date.now()}`, speaker: -1, text, at: (Date.now() - started) / 1000 };
+      setTurns((t) => [...t, turn]);
+    };
+    askRef.current = (text) => {
+      if (ws.readyState === WebSocket.OPEN && ready) sendAsk(text);
+      else pendingAskRef.current = text;
+    };
 
     const started = Date.now();
     const playing = new Set<AudioBufferSourceNode>();
     let nextAt = 0;
     let opened = false;
     let userStopped = false;
+    let diarized = false;
+    let agentTurns = 0;
+
+    levelRef.current = () =>
+      Math.min(1, (playing.size ? rms(outAnalyser, outBuf) : rms(micAnalyser, micBuf)) * 4);
 
     // Barge-in: drop whatever agent audio is still queued.
     const flush = () => {
@@ -134,7 +172,7 @@ export default function VoicePanel({
       for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
       const src = out.createBufferSource();
       src.buffer = buffer;
-      src.connect(out.destination);
+      src.connect(outAnalyser);
       nextAt = Math.max(nextAt, out.currentTime + 0.05);
       src.start(nextAt);
       nextAt += buffer.duration;
@@ -147,11 +185,14 @@ export default function VoicePanel({
 
     const release = () => {
       flush();
+      levelRef.current = () => 0;
       node.port.onmessage = null;
       stream.getTracks().forEach((t) => t.stop());
       void mic.close();
       void out.close();
       stopRef.current = null;
+      askRef.current = null;
+      pendingAskRef.current = null;
     };
 
     stopRef.current = () => {
@@ -172,17 +213,44 @@ export default function VoicePanel({
 
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
       if (typeof e.data !== "string") return play(e.data);
-      let m: { type?: string; role?: string; content?: string; message?: string; result?: SedesResult };
+      let m: Message;
       try {
         m = JSON.parse(e.data);
       } catch {
         return;
       }
+      const at = (Date.now() - started) / 1000;
       switch (m.type) {
         case "ConversationText":
-          if ((m.role === "user" || m.role === "assistant") && m.content) {
-            const line = { role: m.role, content: m.content, at: Date.now() - started } as Line;
-            setLines((l) => [...l, line]);
+          if (!m.content) break;
+          if (m.role === "assistant") {
+            const turn: Turn = { id: `a${agentTurns++}`, speaker: null, text: m.content, at };
+            setTurns((t) => [...t, turn]);
+          } else if (m.role === "user" && !diarized && !askedTexts.delete(m.content)) {
+            // Fallback until the diarized stream delivers its first turn.
+            const turn: Turn = { id: `u${at}`, speaker: 0, text: m.content, at };
+            setTurns((t) => [...t, turn]);
+          }
+          break;
+        case "Transcript":
+          if (m.id && m.text && typeof m.speaker === "number") {
+            const turn: Turn = { id: m.id, speaker: m.speaker, text: m.text, at: m.start ?? at };
+            const first = !diarized;
+            diarized = true;
+            setTurns((t) => [...(first ? t.filter((x) => !x.id.startsWith("u")) : t), turn].sort((a, b) => a.at - b.at));
+          }
+          break;
+        case "Sentiment":
+          if (m.id && m.sentimiento && m.emocion && typeof m.intensidad === "number") {
+            const sentiment: Sentiment = { sentimiento: m.sentimiento, emocion: m.emocion, intensidad: m.intensidad };
+            setTurns((t) => t.map((x) => (x.id === m.id ? { ...x, sentiment } : x)));
+          }
+          break;
+        case "SettingsApplied":
+          ready = true;
+          if (pendingAskRef.current) {
+            sendAsk(pendingAskRef.current);
+            pendingAskRef.current = null;
           }
           break;
         case "UserStartedSpeaking":
@@ -220,70 +288,23 @@ export default function VoicePanel({
         setError("Se cortó la conversación. Pulsa Hablar para reconectar.");
       }
     };
-  }
+  }, [documentId, onSedes]);
 
-  const active = status !== "idle";
-
-  return (
-    <section aria-labelledby="voice-title" className="flex flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="voice-title" className="text-lg font-semibold">
-          Conversación
-        </h2>
-        <span
-          aria-live="polite"
-          className={`rounded-full px-3 py-1 text-sm font-medium ${
-            active ? "bg-accent/15 text-accent" : "text-muted"
-          }`}
-        >
-          {STATUS_TEXT[status]}
-        </span>
-      </div>
-      <p className="mt-1 text-sm text-muted">
-        {documentId
-          ? "Pregúntame por tu documento o dime qué necesitas y en qué municipio estás."
-          : "Dime qué necesitas y en qué municipio estás. También puedes subir un documento."}
-      </p>
-
-      <button
-        type="button"
-        onClick={() => {
-          if (!active) return void start();
-          if (stopRef.current) return stopRef.current();
-          // Still waiting for the permission prompt: abandon this attempt.
-          cancelledRef.current = true;
-          setStatus("idle");
-        }}
-        disabled={!hydrated}
-        className={`mt-4 rounded-xl px-4 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60 ${
-          active ? "bg-danger" : "bg-accent"
-        }`}
-      >
-        {!hydrated ? "Cargando..." : status === "permission" ? "Cancelar" : active ? "Terminar" : "Hablar"}
-      </button>
-
-      {status === "permission" && (
-        <p className="mt-3 text-sm font-medium">
-          Tu navegador te está pidiendo permiso para usar el micrófono: pulsa Permitir en el aviso junto a la barra de direcciones.
-        </p>
-      )}
-
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      <h3 className="mt-5 text-sm font-semibold">Transcripción</h3>
-      <ol ref={logRef} aria-live="polite" className="mt-2 max-h-80 min-h-24 space-y-2 overflow-y-auto text-sm">
-        {lines.length === 0 && <li className="text-muted">Aquí aparece lo que digamos.</li>}
-        {lines.map((l, i) => (
-          <li key={i} className={l.role === "user" ? "text-foreground" : "text-accent"}>
-            <span className="font-mono text-xs text-muted">{clock(l.at)}</span>{" "}
-            <span className="font-semibold">{l.role === "user" ? "Tú" : "Agente"}:</span> {l.content}
-          </li>
-        ))}
-      </ol>
-    </section>
+  const ask = useCallback(
+    (text: string) => {
+      if (askRef.current) return askRef.current(text);
+      pendingAskRef.current = text;
+      void start();
+    },
+    [start],
   );
+
+  const stop = useCallback(() => {
+    if (stopRef.current) return stopRef.current();
+    // Still waiting for the permission prompt: abandon this attempt.
+    cancelledRef.current = true;
+    setStatus("idle");
+  }, []);
+
+  return { status, turns, error, start, stop, ask, levelRef };
 }

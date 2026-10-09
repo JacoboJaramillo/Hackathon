@@ -134,11 +134,13 @@ export function soqlString(s) {
   return `'${String(s).replaceAll("'", "''")}'`;
 }
 
-async function getJson(url, token, fetchImpl) {
+// datos.gov.co answers intermittent 5xx; one quick retry covers most of them.
+async function getJson(url, token, fetchImpl, retries = 1) {
   const res = await fetchImpl(url, {
     headers: token ? { 'X-App-Token': token } : {},
     signal: AbortSignal.timeout(8000),
   });
+  if (res.status >= 500 && retries > 0) return getJson(url, token, fetchImpl, retries - 1);
   if (!res.ok) throw new Error(`datos.gov.co ${res.status}`);
   return res.json();
 }
@@ -160,9 +162,23 @@ export function loadMunicipios({ token, fetchImpl = fetch } = {}) {
 }
 
 // Test hook: the cache is module-level by contract.
-export function _resetCache() { municipiosPromise = null; }
+// ponytail: the registry is a static snapshot, so successful queries are kept
+// for the life of the instance (bounded by count); move to Redis if instances grow.
+const rowsCache = new Map();
+const ROWS_CACHE_MAX = 500;
+
+export function _resetCache() { municipiosPromise = null; rowsCache.clear(); }
 
 async function fetchRows(conds, token, fetchImpl) {
+  const key = conds.join(' AND ');
+  if (rowsCache.has(key)) return rowsCache.get(key);
+  const rows = await fetchRowsUncached(conds, token, fetchImpl);
+  if (rowsCache.size >= ROWS_CACHE_MAX) rowsCache.delete(rowsCache.keys().next().value);
+  rowsCache.set(key, rows);
+  return rows;
+}
+
+async function fetchRowsUncached(conds, token, fetchImpl) {
   const rows = [];
   for (let offset = 0; offset < ROW_CAP; offset += PAGE) {
     const page = await getJson(

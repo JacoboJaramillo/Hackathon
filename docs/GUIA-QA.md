@@ -27,8 +27,8 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 | 2 | Esqueleto desplegado con URL pública | Hecho |
 | 3 | Subida de documento y brief de 3 a 5 preguntas | Hecho |
 | 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Hecho (pruebas del QA pendientes) |
-| 5 | Transcripción diarizada y panel de sentimiento | Siguiente |
-| 6 | Pulido de UX | Pendiente |
+| 5 | Transcripción diarizada y panel de sentimiento | Hecho (medir separación de voces reales) |
+| 6 | Pulido de UX | En curso (Gabriela, preguntas tocables, Cómo llegar) |
 | 7 | Congelamiento (14:30): auditoría de seguridad, break test, documentación | Pendiente |
 | 8 | Despliegue final y ensayo de la demo | Pendiente |
 
@@ -43,8 +43,34 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: Gabriela redesign, diarized transcript, live sentiment, tap-to-ask and directions
+Fecha: 2026-10-09, 12:18.
+
+Qué se hizo:
+- La asistente se llama Gabriela: se presenta así y la página gira alrededor de ella. Su avatar es un orbe animado que reacciona a la voz real: crece y brilla con el volumen, azul cuando escucha, violeta pulsante cuando piensa y rosa cuando habla.
+- Transcripción diarizada (paso 5): el servidor abre una segunda transcripción de Deepgram con separación de hablantes. En pantalla aparecen "Hablante 1", "Hablante 2" y "Gabriela", con la hora de cada intervención.
+- Panel de sentimiento y emociones: cada intervención de una persona recibe sentimiento (positivo, neutral o negativo), emoción (calma, preocupación, miedo, urgencia y otras) e intensidad, en unos 1,2 s. Muestra la emoción actual por hablante y una línea de tendencia.
+- Preguntas del brief tocables: al tocar una sugerencia, Gabriela la responde (si no hay conversación abierta, la abre). Se ve en la transcripción como "Tú (pregunta tocada)".
+- Tarjetas de sedes con enlace "Cómo llegar" que abre Google Maps (nada se envía a Google hasta que la persona lo toca).
+- Resiliencia: datos.gov.co da 5xx intermitentes y tarda hasta 11 s; ahora hay un reintento, caché en memoria de las búsquedas (los datos no cambian) y la lista de municipios se precarga al arrancar.
+- Documentación nueva: `README.md`, `CHANGELOG.md`, `docs/SECURITY.md`, `docs/TRACEABILITY.md`, `docs/INTEGRATIONS.md` y `docs/DATA-MODEL.md`.
+
+Cómo probarlo:
+1. Abrir la URL pública en Chrome con audífonos y pulsar "Hablar con Gabriela". El orbe debe moverse con tu voz y con la de ella.
+2. Hablar dos personas por turnos, con frases largas: la transcripción debe separar Hablante 1 y Hablante 2.
+3. Decir algo preocupado ("estoy muy asustado, mi hijo tiene fiebre alta"): en unos 2 s aparece la emoción en la transcripción y en el panel.
+4. Subir un documento y tocar una de las preguntas sugeridas: Gabriela la responde con "según tu documento".
+5. Pedir urgencias en un municipio y tocar "Cómo llegar" en una tarjeta: abre Google Maps.
+6. `cd web && npm test`: 63 pasan, 0 fallan (4 en vivo se saltan). Suite de integración local: 15 de 15.
+
+Resultado esperado: lo anterior, sin errores en la consola.
+
+Qué no se puede probar todavía: nada pendiente de este paso, salvo lo de abajo.
+
+Riesgos conocidos: en una prueba con dos voces sintéticas cortas, Deepgram las marcó a ambas como el mismo hablante; con voces reales y frases más largas se separan mejor, y eso es lo que hay que medir (criterio de 80 %). La diarización duplica el costo de transcripción por sesión. datos.gov.co puede seguir lento en la primera búsqueda de cada municipio.
+
 ### docs: adversarial conversation script for QA
-Fecha: 2026-10-09, 12:15.
+Fecha: 2026-10-09, 11:56.
 
 Qué se hizo: `docs/QA-CONVERSACIONES.md`, un guion de unas 200 frases para decirle al agente en voz alta, pensado como lo haría un jurado que quiere romper el sistema. Está agrupado en 15 secciones: flujo normal, emergencias, diagnóstico, datos que el registro no tiene, fecha de los datos, municipios difíciles, temas fuera de la misión, ataques por voz, tres documentos de prueba listos para copiar (normal, con trampa y hostil), preguntas sobre el documento, carga de archivos, voz e interrupciones, memoria de la conversación, privacidad y chequeos técnicos. Cada frase dice qué debe pasar y contra qué regla se compara.
 
@@ -60,7 +86,7 @@ Qué no se puede probar todavía: diarización y sentimiento (paso 5). Firefox n
 Riesgos conocidos: cada conversación cuesta dinero (Deepgram y DeepSeek); no dejar sesiones abiertas sin uso.
 
 ### test: 50 000 user load test and capacity model to 100 000 users
-Fecha: 2026-10-09, 12:05.
+Fecha: 2026-10-09, 11:48.
 
 Qué se hizo:
 - Prueba de carga contra producción con 51 749 usuarios en 5,8 minutos (cargan la página y la salud): 103 498 peticiones, 0 errores, p95 191 ms, con 2 instancias.
@@ -79,7 +105,7 @@ Qué no se puede probar todavía: 100 000 usuarios simultáneos reales; necesita
 Riesgos conocidos: durante el estrés se desplegó una revisión nueva, por eso el punto de quiebre es aproximado. Correr el estrés vuelve lenta la página para quien la esté usando.
 
 ### fix: talk button waits for the page to be ready
-Fecha: 2026-10-09, 11:58.
+Fecha: 2026-10-09, 11:42.
 
 Qué se hizo: el botón Hablar dice "Cargando..." y está desactivado hasta que la página termina de cargar su JavaScript. Antes, un clic en los primeros segundos (más largos si el servidor está ocupado) se perdía sin aviso y parecía que la página no dejaba hablar. Mientras se espera el permiso del micrófono, el botón dice "Cancelar".
 
@@ -92,7 +118,7 @@ Qué no se puede probar todavía: diarización y sentimiento (paso 5).
 Riesgos conocidos: ninguno nuevo.
 
 ### security: audit fixes for uploads and limiter; clearer microphone permission flow
-Fecha: 2026-10-09, 11:50.
+Fecha: 2026-10-09, 11:37.
 
 Qué se hizo (hallazgos de la auditoría del paso 3 y un problema de uso):
 - Lectura de PDF y DOCX aislada en un hilo aparte con 192 MB de memoria y 10 s como máximo. Antes un archivo pequeño que se descomprime enorme podía congelar o tumbar el servidor y cortar la voz de todos.
@@ -152,7 +178,7 @@ Qué no se puede probar todavía: CP-028, CP-029 y CP-071 desde la interfaz (pas
 Riesgos conocidos: ninguno nuevo.
 
 ### feat: document upload with brief and document-grounded voice sessions
-Fecha: 2026-10-09, 11:12.
+Fecha: 2026-10-09, 11:17.
 
 Qué se hizo:
 - La página ya no es la plantilla de Next.js. Muestra el nombre del producto, el aviso "Si es una emergencia, llama al 123", la tarjeta para subir el documento y un espacio reservado para la voz (llega en el paso 4).

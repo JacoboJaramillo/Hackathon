@@ -202,11 +202,6 @@ Una fila por ejecución. Las cuatro primeras ya están verificadas.
 | R-002 | CP-002 | 2026-10-09 09:30 | c77a282 | Desarrollador | Aprobado | `.env` fuera de git; gitleaks sin hallazgos en lo versionado |
 | R-003 | CP-003 | 2026-10-09 09:30 | c77a282 | Desarrollador | Aprobado | `npm audit --omit=dev`: 0 vulnerabilidades |
 | R-004 | CP-004 | 2026-10-09 09:40 | 0db2d37 | Desarrollador | Aprobado | 3 preguntas correctas con latencia de 1,8 a 2,7 s; Leticia con 2 IPS públicas, coincide con datos.gov.co (`docs/GUIA-QA.md`, entrada del spike) |
-
-Plantilla para nuevas ejecuciones (copiar la fila):
-
-| Resultado | Caso | Fecha y hora | Commit | Ejecutor | Resultado | Evidencia |
-|---|---|---|---|---|---|---|
 | R-005 | CP-041, CP-042, CP-043, CP-045 | 2026-10-09 10:40 | paso 2 | Desarrollador | Aprobado | `tests/integration/proxy.test.mjs` contra producción: Origin ajeno 403, tercera sesión 429, frame de 65 KB cierra con 1009, mensaje de texto desconocido cierra con 1008. 7 de 7 pruebas pasan. En CP-043 solo se probó el frame binario; en CP-045 solo el tipo desconocido |
 | R-006 | CP-049, CP-052 | 2026-10-09 10:40 | paso 2 | Desarrollador | Aprobado | Cabeceras presentes y sin `x-powered-by` (falló en el primer despliegue, corregido y verificado). `/.env`, `/.git/config`, `/package.json`, `/server.mjs` y un `.map` responden 404 |
 | R-007 | CP-050 | 2026-10-09 10:40 | paso 2 | Desarrollador | Aprobado | Página abierta en Chrome: sin errores de la aplicación ni violaciones de CSP en consola |

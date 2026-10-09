@@ -39,7 +39,7 @@ const row = (code, tipo, n, extra = {}) => ({
   num_cantidad_capacidad_instalada: String(n), ...extra,
 });
 
-test('NEEDS has the contract keys and the tool enum matches', () => {
+test('RF-010 NEEDS has the contract keys and the tool enum matches', () => {
   assert.deepEqual(Object.keys(NEEDS), [
     'consulta_general', 'urgencias', 'partos', 'neonatal', 'pediatria', 'uci_adultos', 'hospitalizacion',
     'cirugia', 'dialisis', 'cancer', 'quemados', 'salud_mental', 'adicciones', 'ambulancia', 'unidad_movil',
@@ -47,13 +47,13 @@ test('NEEDS has the contract keys and the tool enum matches', () => {
   assert.deepEqual(TOOL_DEFINITION.parameters.properties.necesidad.enum, Object.keys(NEEDS));
 });
 
-test('validateArgs accepts string and object, trims', () => {
+test('RF-010 validateArgs accepts string and object, trims', () => {
   const r = validateArgs('{"necesidad":"partos","municipio":"  Leticia "}');
   assert.deepEqual(r, { ok: true, value: { necesidad: 'partos', municipio: 'Leticia' } });
   assert.equal(validateArgs({ necesidad: 'cirugia', municipio: 'X', naturaleza: 'Mixta', departamento: 'Y' }).ok, true);
 });
 
-test('validateArgs rejects bad input', () => {
+test('RF-010 validateArgs rejects bad input', () => {
   const bad = [
     'not json', '[]', '{"necesidad":"partos"}', { necesidad: 'nope', municipio: 'x' },
     { necesidad: 'partos', municipio: 'x', extra: 1 }, { necesidad: 'partos', municipio: 5 },
@@ -63,49 +63,49 @@ test('validateArgs rejects bad input', () => {
   for (const b of bad) assert.equal(validateArgs(b).ok, false, JSON.stringify(b));
 });
 
-test('normalize strips accents, case and whitespace', () => {
+test('RF-011 normalize strips accents, case and whitespace', () => {
   assert.equal(normalize('  Medellín   de  Ñu '), 'MEDELLIN DE NU');
 });
 
-test('resolveMunicipio fuzzy matches', () => {
+test('RF-011 resolveMunicipio fuzzy matches', () => {
   for (const [input, want] of [['Letizia', 'LETICIA'], ['medellin', 'MEDELLÍN'], ['Cucuta', 'CÚCUTA'], ['Ibague', 'IBAGUÉ']]) {
     assert.equal(resolveMunicipio(input, LIST).match.municipio, want);
   }
   assert.equal(resolveMunicipio('Leticia', LIST).score, 1);
 });
 
-test('resolveMunicipio returns suggestions for nonsense', () => {
+test('RF-011 resolveMunicipio returns suggestions for nonsense', () => {
   const r = resolveMunicipio('Zzzzxqwk', LIST);
   assert.equal(r.match, null);
   assert.ok(r.suggestions.length >= 1 && r.suggestions.length <= 3);
 });
 
-test('resolveMunicipio uses departamento only as tie-break', () => {
+test('RF-011 resolveMunicipio uses departamento only as tie-break', () => {
   assert.equal(resolveMunicipio('Santa Rosa', LIST, 'Risaralda').match.departamento, 'RISARALDA');
   assert.equal(resolveMunicipio('Leticia', LIST, 'Antioquia').match.municipio, 'LETICIA');
 });
 
-test('soqlString doubles quotes', () => {
+test('RNF-004 soqlString doubles quotes', () => {
   assert.equal(soqlString("D'ARC"), "'D''ARC'");
 });
 
-test('official name with a quote is escaped in the query', async () => {
+test('RNF-004 official name with a quote is escaped in the query', async () => {
   const f = fakeFetch(() => []);
   await buscarSedes({ necesidad: 'partos', municipio: "San Jose D'Arc" }, { fetchImpl: f });
   assert.ok(f.urls.some((u) => u.includes("municipio='SAN JOSE D''ARC'")));
 });
 
-test('loadMunicipios caches success only', async () => {
+test('RF-009 loadMunicipios caches success only', async () => {
   let calls = 0;
   const failing = async () => { calls++; return { ok: false, status: 500 }; };
   await assert.rejects(loadMunicipios({ fetchImpl: failing }));
   const good = async () => { calls++; return { ok: true, json: async () => LIST }; };
   await loadMunicipios({ fetchImpl: good });
   await loadMunicipios({ fetchImpl: good });
-  assert.equal(calls, 2);
+  assert.equal(calls, 3, "the 500 is retried once, then the good list is cached");
 });
 
-test('aggregates by sede, sorts by capacity, caps at 20, hides personal data', async () => {
+test('RF-013 RF-019 aggregates by sede, sorts by capacity, caps at 20, hides personal data', async () => {
   const rows = [];
   for (let i = 1; i <= 25; i++) {
     rows.push(row(`S${i}`, 'Partos', i, { gerente: 'Ana', email: 'a@b.co' }));
@@ -124,7 +124,7 @@ test('aggregates by sede, sorts by capacity, caps at 20, hides personal data', a
   assert.ok(f.urls.every((u) => !/gerente|email/.test(u)));
 });
 
-test('falls back to departamento when municipio has no sedes', async () => {
+test('RF-012 falls back to departamento when municipio has no sedes', async () => {
   const f = fakeFetch((where) => (where.includes('municipio=') ? [] : [row('D1', 'Sillas de Hemodiálisis', 4, { naturaleza: 'Privada', num_nivel_atencion: '2' })]));
   const r = await buscarSedes({ necesidad: 'dialisis', municipio: 'Leticia', naturaleza: 'Privada' }, { fetchImpl: f });
   assert.equal(r.alcance, 'departamento');
@@ -132,19 +132,19 @@ test('falls back to departamento when municipio has no sedes', async () => {
   assert.ok(f.urls.some((u) => u.includes("naturaleza='Privada'")));
 });
 
-test('ambulancia restricts by group', async () => {
+test('RF-010 ambulancia restricts by group', async () => {
   const f = fakeFetch(() => []);
   await buscarSedes({ necesidad: 'ambulancia', municipio: 'Leticia' }, { fetchImpl: f });
   assert.ok(f.urls.some((u) => u.includes("nom_grupo_capacidad='AMBULANCIAS'")));
 });
 
-test('query URL never contains raw user text', async () => {
+test('RNF-004 query URL never contains raw user text', async () => {
   const f = fakeFetch(() => []);
   await buscarSedes({ necesidad: 'partos', municipio: "Letizia' OR 1=1 --" }, { fetchImpl: f });
   assert.ok(f.urls.every((u) => !u.includes('Letizia') && !u.includes('OR 1=1')));
 });
 
-test('errors map to contract codes', async () => {
+test('RF-009 errors map to contract codes', async () => {
   assert.deepEqual(await buscarSedes({ necesidad: 'x', municipio: 'y' }, { fetchImpl: fakeFetch(() => []) }), { error: 'parametros_invalidos' });
   const none = await buscarSedes({ necesidad: 'partos', municipio: 'Zzzzxqwk' }, { fetchImpl: fakeFetch(() => []) });
   assert.equal(none.error, 'municipio_no_encontrado');
@@ -158,7 +158,7 @@ test('errors map to contract codes', async () => {
 
 const live = process.env.LIVE === '1';
 
-test('live: partos in Letizia', { skip: !live }, async () => {
+test('RF-009 live: partos in Letizia', { skip: !live }, async () => {
   const r = await buscarSedes({ necesidad: 'partos', municipio: 'Letizia' }, {});
   console.log('live partos', r.alcance, r.municipio, r.total_sedes);
   assert.equal(r.alcance, 'municipio');
@@ -166,9 +166,25 @@ test('live: partos in Letizia', { skip: !live }, async () => {
   assert.ok(r.total_sedes >= 1);
 });
 
-test('live: dialisis in Medellin', { skip: !live }, async () => {
+test('RF-009 live: dialisis in Medellin', { skip: !live }, async () => {
   const r = await buscarSedes({ necesidad: 'dialisis', municipio: 'Medellin' }, {});
   console.log('live dialisis', r.alcance, r.municipio, r.total_sedes);
   assert.equal(r.municipio, 'MEDELLÍN');
   assert.ok(r.total_sedes >= 1);
+});
+
+test('RF-009 a 5xx is retried once and successful queries are cached', async () => {
+  _resetCache();
+  let calls = 0;
+  const fetchImpl = async (url) => {
+    calls++;
+    if (url.includes('$select=municipio')) return { ok: true, status: 200, json: async () => [{ municipio: 'LETICIA', departamento: 'AMAZONAS' }] };
+    if (calls === 2) return { ok: false, status: 503, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => [] };
+  };
+  await buscarSedes({ necesidad: 'urgencias', municipio: 'Leticia' }, { fetchImpl });
+  const afterFirst = calls;
+  await buscarSedes({ necesidad: 'urgencias', municipio: 'Leticia' }, { fetchImpl });
+  assert.equal(calls, afterFirst, 'second identical search served from cache');
+  _resetCache();
 });

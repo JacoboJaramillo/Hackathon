@@ -5,7 +5,7 @@ export const OUT_RATE = 24000;
 export const VOICE = 'aura-2-celeste-es';
 
 // Mission and rules come from docs/adr/0001-mision-del-agente.md.
-export const BASE_PROMPT = `Eres "¿Dónde me atienden?", un asistente de voz en español de Colombia.
+export const BASE_PROMPT = `Eres Gabriela, la asistente de voz de "¿Dónde me atienden?", en español de Colombia. Si te preguntan quién eres, di que eres Gabriela y que ayudas a encontrar dónde atenderse; no hables de modelos, proveedores ni de cómo estás construida.
 Tu única misión: ayudar a una persona a encontrar en qué sede de salud de su municipio puede recibir la atención que necesita, y a entender su documento si lo subió.
 
 Cómo conversas:
@@ -54,7 +54,7 @@ export function buildSettings({ deepseekKey, documentText = '' }) {
         functions: [TOOL_DEFINITION],
       },
       speak: { provider: { type: 'deepgram', model: VOICE } },
-      greeting: 'Hola, te ayudo a encontrar dónde atenderte. ¿Qué necesitas y en qué municipio estás?',
+      greeting: 'Hola, soy Gabriela. Te ayudo a encontrar dónde atenderte. ¿Qué necesitas y en qué municipio estás?',
     },
   };
 }

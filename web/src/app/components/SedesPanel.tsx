@@ -1,10 +1,18 @@
-import type { SedesResult } from "./VoicePanel";
+import type { Sede, SedesResult } from "./useVoiceSession";
 
 const ERRORS: Record<string, string> = {
   municipio_no_encontrado: "No encontré ese municipio.",
   servicio_no_disponible: "El registro de sedes no respondió. Intenta de nuevo en un momento.",
   parametros_invalidos: "No entendí bien la búsqueda. Dímela de nuevo.",
 };
+
+// Opens Google Maps only when the person taps the link; nothing is sent before.
+const mapsUrl = (s: Sede, r: SedesResult) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    [s.sede, s.direccion, r.alcance === "municipio" ? r.municipio : null, r.departamento, "Colombia"]
+      .filter(Boolean)
+      .join(", "),
+  )}`;
 
 export default function SedesPanel({ result }: { result: SedesResult }) {
   if (result.error) {
@@ -41,6 +49,18 @@ export default function SedesPanel({ result }: { result: SedesResult }) {
             <p className="font-semibold">{s.sede ?? s.prestador}</p>
             {s.prestador && s.prestador !== s.sede && <p className="text-muted">{s.prestador}</p>}
             {s.direccion && <p className="mt-2">{s.direccion}</p>}
+            {s.direccion && (
+              <p className="mt-1">
+                <a
+                  className="font-medium text-accent underline"
+                  href={mapsUrl(s, result)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Cómo llegar
+                </a>
+              </p>
+            )}
             {s.telefono && (
               <p>
                 <a className="text-accent underline" href={`tel:${s.telefono.replace(/[^\d+]/g, "")}`}>

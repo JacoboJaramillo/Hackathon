@@ -22,8 +22,10 @@ type State =
 
 export default function DocumentUpload({
   onReady,
+  onAsk,
 }: {
   onReady: (doc: ReadyDocument) => void;
+  onAsk: (question: string) => void;
 }) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [dragging, setDragging] = useState(false);
@@ -108,13 +110,13 @@ export default function DocumentUpload({
             {state.message}
           </p>
         )}
-        {state.kind === "ready" && <Result doc={state.doc} />}
+        {state.kind === "ready" && <Result doc={state.doc} onAsk={onAsk} />}
       </div>
     </section>
   );
 }
 
-function Result({ doc }: { doc: Created }) {
+function Result({ doc, onAsk }: { doc: Created; onAsk: (question: string) => void }) {
   return (
     <div className="space-y-3">
       <p className="text-muted">
@@ -128,10 +130,19 @@ function Result({ doc }: { doc: Created }) {
             <p className="mt-1">{doc.brief.resumen}</p>
           </div>
           <div>
-            <h3 className="font-semibold">Puedes preguntarme</h3>
-            <ul className="mt-1 list-disc space-y-1 pl-5">
+            <h3 className="font-semibold">Pregúntale a Gabriela</h3>
+            <p className="text-xs text-muted">Toca una pregunta o dila en voz alta.</p>
+            <ul className="mt-2 flex flex-col gap-2">
               {doc.brief.preguntas.map((q) => (
-                <li key={q}>{q}</li>
+                <li key={q}>
+                  <button
+                    type="button"
+                    onClick={() => onAsk(q)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-left transition hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {q}
+                  </button>
+                </li>
               ))}
             </ul>
           </div>

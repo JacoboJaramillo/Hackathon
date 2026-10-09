@@ -7,9 +7,11 @@ import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createLimiter, isAllowedOrigin, clientIp } from './server/limits.mjs';
 import { buildSettings } from './server/agent-settings.mjs';
-import { buscarSedes } from './server/ips.mjs';
+import { buscarSedes, loadMunicipios } from './server/ips.mjs';
 import { parseDocument, createDocumentStore, MAX_BYTES } from './server/documents.mjs';
 import { generateBrief } from './server/brief.mjs';
+import { createDiarizer } from './server/diarize.mjs';
+import { classifySentiment } from './server/sentiment.mjs';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT) || 3000;
@@ -25,6 +27,9 @@ const withDeadline = (promise, ms) => Promise.race([
   promise,
   new Promise((_, reject) => setTimeout(() => reject(new Error('deadline')), ms).unref()),
 ]);
+// Typed questions (tapped brief suggestions): short plain text only.
+const MAX_ASKS_PER_SESSION = 20;
+const validAsk = (t) => typeof t === 'string' && t.trim().length > 0 && t.length <= 300;
 const DEEPGRAM_URL = 'wss://agent.deepgram.com/v1/agent/converse';
 // Upstream events the browser needs; everything else stays on the server.
 const FORWARD_TYPES = new Set([
@@ -102,12 +107,30 @@ function runSession(client, { id, ip, release, documentText }) {
     closed = true;
     clearTimeout(maxTimer);
     release();
+    diarizer.close();
     if (client.readyState === WebSocket.OPEN) client.close(code, reason);
     if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) upstream.terminate();
     logEvent('session_end', { id, ip, code, reason, seconds: Math.round((Date.now() - started) / 1000) });
   };
   const maxTimer = setTimeout(() => close(4000, 'session_time_limit'), SESSION_MAX_MS);
   const sendClient = (obj) => client.readyState === WebSocket.OPEN && client.send(JSON.stringify(obj));
+
+  // Diarized transcript and sentiment (RF-007, RF-008) run beside the agent;
+  // any failure here only loses the panel, never the voice session.
+  let sentimentInFlight = 0;
+  const diarizer = createDiarizer({
+    apiKey: DEEPGRAM_API_KEY,
+    log: (event, fields) => logEvent(event, { id, ...fields }),
+    onTurn: async (turn) => {
+      sendClient({ type: 'Transcript', id: turn.id, speaker: turn.speaker, text: turn.text, start: turn.start, end: turn.end });
+      // Cap concurrent paid calls per session; a dropped turn just has no badge.
+      if (turn.wordCount < 2 || sentimentInFlight >= 2) return;
+      sentimentInFlight += 1;
+      const s = await classifySentiment(turn.text, { apiKey: DEEPSEEK_API_KEY });
+      sentimentInFlight -= 1;
+      if (s) sendClient({ type: 'Sentiment', id: turn.id, ...s });
+    },
+  });
 
   upstream.on('open', () => {
     upstream.send(JSON.stringify(buildSettings({ deepseekKey: DEEPSEEK_API_KEY, documentText })));
@@ -151,17 +174,24 @@ function runSession(client, { id, ip, release, documentText }) {
     close(1011, 'upstream_error');
   });
 
+  let asks = 0;
   client.on('message', (data, isBinary) => {
     if (!isBinary) {
-      // Only KeepAlive is accepted as text; anything else could inject agent
-      // instructions or settings into the upstream session.
+      // Only KeepAlive and AskText are accepted as text, and both are rebuilt
+      // here: forwarding client JSON could inject settings or a new prompt.
       let msg;
       try { msg = JSON.parse(data.toString()); } catch { return close(1008, 'invalid_message'); }
-      if (msg?.type !== 'KeepAlive') return close(1008, 'invalid_message');
-      data = JSON.stringify({ type: 'KeepAlive' });
+      if (msg?.type === 'KeepAlive') data = JSON.stringify({ type: 'KeepAlive' });
+      else if (msg?.type === 'AskText' && validAsk(msg.text)) {
+        if (++asks > MAX_ASKS_PER_SESSION) return;
+        // A tapped question becomes a normal user turn; the system prompt and
+        // its rules still apply to it.
+        data = JSON.stringify({ type: 'InjectUserMessage', content: msg.text.trim() });
+      } else return close(1008, 'invalid_message');
     }
     if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: isBinary });
     else if (pending.length < 50) pending.push(data);
+    if (isBinary) diarizer.send(data);
   });
   client.on('close', () => close(1000, 'client_closed'));
   client.on('error', () => close(1011, 'client_error'));
@@ -232,6 +262,9 @@ async function handleUpload(req, res) {
     slot.release();
   }
 }
+
+// Warm the municipality list so the first voice search does not pay for it.
+loadMunicipios({ token: DATOSGOV_APP_TOKEN }).catch(() => {});
 
 server.listen(port, () => {
   logEvent('server_listening', { port, dev, allowedOrigins: ALLOWED_ORIGINS.length });
