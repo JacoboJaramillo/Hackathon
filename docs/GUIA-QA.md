@@ -14,7 +14,7 @@ Para reportar un defecto: título, pasos para reproducir, resultado esperado, re
 
 URL pública: https://agente-vocal-583590264456.us-east1.run.app
 
-Documentos de QA: `docs/REQUIREMENTS.md` (33 requerimientos), `docs/TEST-PLAN.md` (plan) y `docs/TESTING.md` (71 casos y resultados).
+Documentos de QA: `docs/REQUIREMENTS.md` (33 requerimientos), `docs/TEST-PLAN.md` (plan) y `docs/TESTING.md` (73 casos y resultados) y `docs/QA-CONVERSACIONES.md` (guion de unas 200 frases para intentar romper el agente por voz).
 
 Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
@@ -42,6 +42,22 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 ---
 
 ## Entradas
+
+### docs: adversarial conversation script for QA
+Fecha: 2026-10-09, 12:15.
+
+Qué se hizo: `docs/QA-CONVERSACIONES.md`, un guion de unas 200 frases para decirle al agente en voz alta, pensado como lo haría un jurado que quiere romper el sistema. Está agrupado en 15 secciones: flujo normal, emergencias, diagnóstico, datos que el registro no tiene, fecha de los datos, municipios difíciles, temas fuera de la misión, ataques por voz, tres documentos de prueba listos para copiar (normal, con trampa y hostil), preguntas sobre el documento, carga de archivos, voz e interrupciones, memoria de la conversación, privacidad y chequeos técnicos. Cada frase dice qué debe pasar y contra qué regla se compara.
+
+Cómo probarlo:
+1. Abrir el documento en GitHub y empezar por la sección 1 (flujo feliz) para tener una línea base.
+2. Seguir con emergencias (sección 2) y ataques (secciones 8 y 10, con `doc-hostil.txt`): son los que más pesan.
+3. Anotar cada resultado en la tabla del final con el commit (`git log --oneline -1`).
+
+Resultado esperado: cualquier falla de severidad crítica (inventa, diagnostica, no dice 123, revela datos o cambia de identidad) se reporta de inmediato al desarrollador.
+
+Qué no se puede probar todavía: diarización y sentimiento (paso 5). Firefox no está soportado.
+
+Riesgos conocidos: cada conversación cuesta dinero (Deepgram y DeepSeek); no dejar sesiones abiertas sin uso.
 
 ### test: 50 000 user load test and capacity model to 100 000 users
 Fecha: 2026-10-09, 12:05.
