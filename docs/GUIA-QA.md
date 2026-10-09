@@ -18,8 +18,8 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 | Paso | Qué es | Estado |
 |---|---|---|
 | 0 | Repositorio seguro y secretos en la nube | Hecho |
-| 1 | Prueba del riesgo mayor: agente de voz en español con DeepSeek y la herramienta IPS | Siguiente |
-| 2 | Esqueleto desplegado con URL pública | Pendiente |
+| 1 | Prueba del riesgo mayor: agente de voz en español con DeepSeek y la herramienta IPS | Hecho (plan A confirmado) |
+| 2 | Esqueleto desplegado con URL pública | Siguiente |
 | 3 | Subida de documento y brief de 3 a 5 preguntas | Pendiente |
 | 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Pendiente |
 | 5 | Transcripción diarizada y panel de sentimiento | Pendiente |
@@ -37,6 +37,37 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 ---
 
 ## Entradas
+
+### test: spike of Deepgram Voice Agent in Spanish with DeepSeek and IPS tool
+Fecha: 2026-10-09, 10:15.
+
+Qué se hizo: se probó, sin interfaz, que el agente de voz de Deepgram conversa en español usando DeepSeek como cerebro y que llama a la herramienta de IPS. El script genera 3 preguntas habladas con voz sintética, se las dice al agente y mide cuánto tarda en responder. Es la prueba del riesgo mayor del proyecto; salió bien, así que se sigue con el plan A.
+
+Resultados medidos (3 corridas):
+
+| Pregunta | Respuesta del agente | Latencia |
+|---|---|---|
+| ¿Cuántos días a la semana puedo teletrabajar? (está en el documento) | Máximo tres días por semana. | 1,9 a 2,1 s |
+| ¿Cuántas IPS públicas hay en el municipio de Leticia? (herramienta IPS) | En Leticia hay dos IPS públicas, con dieciocho sedes. Coincide con datos.gov.co. | 1,9 a 2,1 s |
+| ¿Cuál es el salario del gerente general? (no está) | No lo sé, porque eso no está en el documento. | 1,8 a 2,7 s |
+
+Desglose de la latencia: transcripción 0,1 s, DeepSeek 0,8 a 1,05 s, voz 0,7 a 0,8 s. La latencia se mide desde que el usuario deja de hablar hasta el primer audio del agente.
+
+Cómo probarlo (necesita el `.env` con claves reales):
+1. `cd web`
+2. `node --env-file=../.env scripts/spike-voice-agent.mjs`
+3. Al final aparece una tabla con pregunta, respuesta, latencia y si usó la herramienta.
+4. Escuchar `web/spike-agent-output.wav` (la voz del agente). Ese archivo no se sube al repositorio.
+5. Verificar el dato real en el navegador: `https://www.datos.gov.co/resource/s2ru-bqt6.json?$select=naturaleza,count(distinct c_digo_prestador)&$where=upper(municipio)='LETICIA'&$group=naturaleza`. Debe decir 2 públicas.
+
+Resultado esperado: las 3 respuestas como en la tabla, la segunda con `uso_funcion` en `true`, latencias de unos 2 s.
+
+No se puede probar todavía: voz real por micrófono, interfaz y documento subido por el usuario (pasos 2 a 4).
+
+Riesgos conocidos y defectos encontrados:
+- **Defecto alto, se corrige en el paso 4:** sin ayuda, la transcripción escuchó "Letizia" en vez de "Leticia" y omitió la palabra "IPS". El agente respondió 0 IPS, que es falso. En este spike se arregló con palabras clave (`keyterms`), pero no se pueden poner los 1.027 municipios. La corrección definitiva es que la herramienta busque el municipio más parecido en la lista oficial. Caso de prueba para el QA: preguntar por municipios con tilde o difíciles (Leticia, Medellín, Cúcuta, Ibagué, Quibdó).
+- Latencia de unos 2 s. Funciona, pero no es instantánea. DeepSeek es la parte más lenta (por decisión, no se cambia de modelo); la voz es la segunda.
+- La voz sintética de entrada es más clara que una voz real con ruido; la prueba real con micrófono se hace en el paso 4.
 
 ### docs: add per-commit QA guide and make it a project rule
 Fecha: 2026-10-09, 09:45.
