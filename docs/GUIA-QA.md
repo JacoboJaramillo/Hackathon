@@ -44,7 +44,7 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 ## Entradas
 
 ### feat: Gabriela knows when a document is uploaded and starts the conversation from it (RF-002)
-Fecha: 2026-10-09, 15:20.
+Fecha: 2026-10-09, 15:11.
 
 Qué se hizo:
 - Si subes el documento antes de pulsar Hablar, Gabriela saluda: "Hola, soy Gabriela. Ya tengo tu documento. ¿Quieres que te lo explique o tienes una pregunta sobre él?".
