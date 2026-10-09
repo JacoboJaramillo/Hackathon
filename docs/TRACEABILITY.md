@@ -1,12 +1,12 @@
 # Trazabilidad de requerimientos
 
-Matriz de `CLAUDE.md` sección 5.3. Fuentes: IDs y criterios de `docs/REQUIREMENTS.md`; casos, estados y resultados (R-xxx) de `docs/TESTING.md`; módulos de `docs/ARCHITECTURE.md`; endpoints de `docs/api/openapi.yaml` y `docs/api/websocket-protocol.md`; entidades de `docs/DATA-MODEL.md`.
+Matriz de `CLAUDE.md` sección 5.3. Fuentes: IDs y criterios de `docs/REQUIREMENTS.md`; casos, estados y resultados (R-xxx) de el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas) y `docs/PRUEBAS-AUDIO.md` para voz; módulos de `docs/ARQUITECTURA.md`; endpoints de `docs/api/openapi.yaml` y `docs/api/websocket-protocol.md`; entidades de `docs/ARQUITECTURA.md` sección 7.
 
 Estados:
 
-- Aprobado: todos los casos del requerimiento figuran Aprobado en `docs/TESTING.md`.
+- Aprobado: todos los casos del requerimiento figuran Aprobado en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas).
 - Parcial: al menos un caso Aprobado y al menos uno Pendiente.
-- Pendiente: ningún caso Aprobado en `docs/TESTING.md`. Puede haber pruebas automáticas de la lógica (se citan en Evidencia) pero el caso de aceptación no se ha ejecutado.
+- Pendiente: ningún caso Aprobado en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas). Puede haber pruebas automáticas de la lógica (se citan en Evidencia) pero el caso de aceptación no se ha ejecutado.
 - En construcción: el módulo no está terminado (paso 5).
 
 Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; SET = `web/server/agent-settings.mjs`; IPS = `web/server/ips.mjs`; DOC = `web/server/documents.mjs` y `parse-worker.mjs`; BRF = `web/server/brief.mjs`; UI = `web/src/app/` (componentes `DocumentUpload`, `VoicePanel`, `SedesPanel`); NXT = `web/next.config.mjs`; WAP = `web/server/whatsapp.mjs`.
@@ -50,23 +50,23 @@ Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; 
 | RNF-004 Seguridad del WebSocket y abuso | LIM, SRV, DOC, SET (`fenceSafe`), IPS | `GET /ws/agent`, `POST /api/document` | LimiterCounters, DocumentRecord | CP-029, CP-041 a CP-048, CP-057, CP-067, CP-068, CP-070 | Parcial | R-005 (CP-041, 042, 043, 045), R-014 (CP-067, CP-070), R-012. Pendiente: CP-029, 044, 046, 047, 048, 057, 068. Pruebas `RNF-004 ...` en `limits.test.mjs`, `documents.test.mjs`, `agent-settings.test.mjs`, `proxy.test.mjs` |
 | RNF-005 Cabeceras de seguridad | NXT | Todas las páginas | Ninguna | CP-049, CP-050, CP-051 | Parcial | R-006 (CP-049), R-007 (CP-050). CP-051 Pendiente |
 | RNF-006 Secretos y exposición | `infra/deploy.sh`, `.gitignore`, `web/.dockerignore`, SRV | Todas | Ninguna | CP-002, CP-052, CP-053, CP-054, CP-055, CP-056 | Parcial | R-002 (CP-002), R-006 (CP-052; también `/.git/config` y un `.map` dan 404). CP-053 a CP-056 Pendiente |
-| RNF-007 Rendimiento y carga | `web/tests/load/*.js` | `GET /`, `GET /api/health`, `/ws/agent` (límites) | Ninguna | CP-058, CP-059, CP-060, CP-061, CP-062, CP-072, CP-073 | Aprobado | R-008 a R-012, R-016 (51 749 recorridos, 0 errores, p95 191 ms), R-017 (solo 429, ningún 5xx). Detalle en `docs/CAPACITY.md` |
+| RNF-007 Rendimiento y carga | `web/tests/load/*.js` | `GET /`, `GET /api/health`, `/ws/agent` (límites) | Ninguna | CP-058, CP-059, CP-060, CP-061, CP-062, CP-072, CP-073 | Aprobado | R-008 a R-012, R-016 (51 749 recorridos, 0 errores, p95 191 ms), R-017 (solo 429, ningún 5xx). Detalle en `docs/ARQUITECTURA.md` sección 10 |
 | RNF-008 README de una página | `README.md` | Ninguno | Ninguna | CP-039 | Pendiente | README escrito; falta que un tercero lo siga en menos de 15 min |
 | RNF-009 Dependencias y repositorio limpios | CI (`.github/workflows/ci.yml`), `package-lock.json` | Ninguno | Ninguna | CP-003, CP-064, CP-065 | Parcial | R-003 (CP-003). CP-064 y CP-065 Pendiente; la CI corre gitleaks y `npm audit` en cada push |
 | RNF-010 Regresión automatizada | `web/server/*.test.mjs`, CI | Ninguno | Ninguna | CP-063 | Pendiente | `npm test` reportó 52 pruebas en verde y 3 en vivo omitidas (`docs/GUIA-QA.md`, commit `050e436`); no hay fila R-xxx para CP-063 |
 
 ## 3. Revisión de la matriz
 
-Revisión hecha contra `docs/REQUIREMENTS.md` y `docs/TESTING.md`.
+Revisión hecha contra `docs/REQUIREMENTS.md` y el historial de git de `docs/TESTING.md` (commit 6eb3dd7).
 
-Requerimientos sin casos de prueba: ninguno. Los 34 (RF-001 a RF-024 y RNF-001 a RNF-010) tienen al menos un caso en `docs/TESTING.md`.
+Requerimientos sin casos de prueba: ninguno. Los 34 (RF-001 a RF-024 y RNF-001 a RNF-010) tienen al menos un caso en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas).
 
-Casos de prueba sin requerimiento: ninguno. Los 85 casos (CP-001 a CP-085) apuntan a un requerimiento existente en la columna "Req." de `docs/TESTING.md`.
+Casos de prueba sin requerimiento: ninguno. Los 85 casos (CP-001 a CP-085) apuntan a un requerimiento existente en la columna "Req." de `docs/TESTING.md` (historial de git, commit 6eb3dd7).
 
 Discrepancias que conviene corregir en los documentos fuente:
 
-- La columna "Casos" del RNF-007 en `docs/REQUIREMENTS.md` lista CP-058 a CP-062 y no incluye CP-072 y CP-073, que sí apuntan a RNF-007 en `docs/TESTING.md`. Esta matriz los incluye.
-- La sección 3 de `docs/REQUIREMENTS.md` dice 65 casos (CP-001 a CP-065); `docs/TESTING.md` tiene 73 (hasta CP-073).
+- La columna "Casos" del RNF-007 en `docs/REQUIREMENTS.md` lista CP-058 a CP-062 y no incluye CP-072 y CP-073, que sí apuntan a RNF-007 en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas). Esta matriz los incluye.
+- La sección 3 de `docs/REQUIREMENTS.md` dice 65 casos (CP-001 a CP-065); `docs/TESTING.md` (historial de git) tiene 73 (hasta CP-073).
 - Pruebas automáticas sin ID de requerimiento en el nombre: las de `web/server/ips.test.mjs` (mapeo implícito a RF-009 a RF-013). `CLAUDE.md` 5.3 pide el ID en el nombre; queda como mejora.
 - Las pruebas k6 y el guion `docs/QA-CONVERSACIONES.md` se asocian a requerimientos por los casos CP-058 a CP-062, CP-072, CP-073 y por la sección correspondiente del guion; el guion no lleva IDs.
 

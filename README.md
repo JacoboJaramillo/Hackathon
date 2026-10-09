@@ -20,13 +20,13 @@ URL pública: https://agente-vocal-583590264456.us-east1.run.app (sin cuentas ni
 4. Cuando el modelo pide `buscar_sedes`, `web/server/ips.mjs` valida los argumentos, resuelve el municipio contra la lista oficial y consulta datos.gov.co con valores escapados.
 5. `POST /api/document` identifica el tipo por firma, extrae el texto en un hilo aislado, lo guarda 30 minutos en memoria y genera un brief con DeepSeek.
 
-Detalle, diagramas y límites de confianza: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Detalle, diagramas y límites de confianza: [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 
 ## Arquitectura en imágenes
 
 ![Vista general del sistema](docs/diagrams/img/01-contexto.png)
 
-De izquierda a derecha: la persona habla con Gabriela en el navegador, que se conecta por HTTPS y WSS al servicio `agente-vocal` en Cloud Run; el servidor, con claves que solo él conoce, habla con Deepgram, DeepSeek, datos.gov.co y (opcional) WhatsApp. Los seis diagramas (contexto, módulos, flujo de voz, despliegue, seguridad y WhatsApp) están en [docs/ARQUITECTURA-VISUAL.md](docs/ARQUITECTURA-VISUAL.md).
+De izquierda a derecha: la persona habla con Gabriela en el navegador, que se conecta por HTTPS y WSS al servicio `agente-vocal` en Cloud Run; el servidor, con claves que solo él conoce, habla con Deepgram, DeepSeek, datos.gov.co y (opcional) WhatsApp. Los seis diagramas (contexto, módulos, flujo de voz, despliegue, seguridad y WhatsApp) están en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 
 ## Decisiones clave
 
@@ -98,22 +98,17 @@ El script es idempotente: habilita las APIs, crea las cuentas de servicio de eje
 
 | Documento | Contenido |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Contexto, módulos, flujo de un turno de voz, límites de confianza, despliegue |
+| [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Arquitectura completa: contexto, módulos, flujo de voz, integraciones, modelo de datos, seguridad, DevOps, capacidad y pruebas |
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 33 requerimientos con criterio de aceptación |
 | [docs/TRACEABILITY.md](docs/TRACEABILITY.md) | Requerimiento, módulo, endpoint, datos, pruebas, estado y evidencia |
 | [docs/api/openapi.yaml](docs/api/openapi.yaml) | Contrato HTTP |
 | [docs/api/websocket-protocol.md](docs/api/websocket-protocol.md) | Protocolo del WebSocket `/ws/agent` |
-| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Servicios externos: protocolo, autenticación, timeouts, fallos |
-| [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | Entidades en memoria, retención y datos sensibles |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas, controles, auditoría y deuda |
-| [docs/TEST-PLAN.md](docs/TEST-PLAN.md) | Plan de pruebas |
-| [docs/TESTING.md](docs/TESTING.md) | Casos, resultados y break test |
-| [docs/CAPACITY.md](docs/CAPACITY.md) | Capacidad medida y camino a 100 000 usuarios |
+| [docs/PRUEBAS-AUDIO.md](docs/PRUEBAS-AUDIO.md) | Reporte de pruebas de audio y voz con lista de verificación |
 | [docs/GUIA-QA.md](docs/GUIA-QA.md) | Bitácora por commit para el QA |
 | [docs/QA-CONVERSACIONES.md](docs/QA-CONVERSACIONES.md) | Guion de unas 200 frases para intentar romper el agente |
-| [docs/PLAN.md](docs/PLAN.md) | Plan original del proyecto |
 | [CHANGELOG.md](CHANGELOG.md) | Cambios por versión |
 
 ## Qué se generó con IA
 
-El código y la documentación de este repositorio se escribieron con Claude Code bajo dirección y revisión humana: el desarrollador define el alcance, decide y revisa cada cambio, y el QA ejecuta las pruebas y el break test. Nada se da por bueno por haber sido generado: lo verifican las pruebas automáticas (`web/server/*.test.mjs`, integración contra producción, k6), la CI con gitleaks y `npm audit`, y una auditoría de seguridad cuyos hallazgos se corrigieron (ver [docs/SECURITY.md](docs/SECURITY.md)). Lo que `docs/TESTING.md` marca como Pendiente no está verificado. En tiempo de ejecución, el agente usa modelos de lenguaje de terceros (DeepSeek, a través de Deepgram) y puede equivocarse; por eso su prompt le prohíbe diagnosticar y le exige decir que no sabe cuando el dato no está en el documento ni en el registro.
+El código y la documentación de este repositorio se escribieron con Claude Code bajo dirección y revisión humana: el desarrollador define el alcance, decide y revisa cada cambio, y el QA ejecuta las pruebas y el break test. Nada se da por bueno por haber sido generado: lo verifican las pruebas automáticas (`web/server/*.test.mjs`, integración contra producción, k6), la CI con gitleaks y `npm audit`, y una auditoría de seguridad cuyos hallazgos se corrigieron (ver [docs/SECURITY.md](docs/SECURITY.md)). Lo que el historial de git de `docs/TESTING.md` (commit 6eb3dd7) marca como Pendiente no está verificado. En tiempo de ejecución, el agente usa modelos de lenguaje de terceros (DeepSeek, a través de Deepgram) y puede equivocarse; por eso su prompt le prohíbe diagnosticar y le exige decir que no sabe cuando el dato no está en el documento ni en el registro.

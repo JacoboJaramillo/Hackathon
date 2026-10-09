@@ -1,6 +1,6 @@
 # Requerimientos
 
-Fuente: hoja "01 RETO" de `V2.xlsx` (R01 a R07 y la hoja "02 CRITERIOS" no fueron entregadas, por eso se infieren), `docs/PLAN.md` sección 3 y `docs/adr/0001-mision-del-agente.md`. Los IDs son estables: no se reutilizan ni se renumeran. La columna "Casos" apunta a `docs/TESTING.md`.
+Fuente: hoja "01 RETO" de `V2.xlsx` (R01 a R07 y la hoja "02 CRITERIOS" no fueron entregadas, por eso se infieren), el plan inicial del proyecto (retirado; ver `docs/ARQUITECTURA.md` sección 2) y `docs/adr/0001-mision-del-agente.md`. Los IDs son estables: no se reutilizan ni se renumeran. La columna "Casos" apunta a los casos de el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas); las pruebas de voz están en `docs/PRUEBAS-AUDIO.md`.
 
 Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive), Baja (deseable).
 
@@ -51,12 +51,12 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 ## 3. Verificación de cobertura
 
 - Requerimientos: 24 funcionales (RF-001 a RF-024) y 10 no funcionales (RNF-001 a RNF-010), 34 en total.
-- Casos de prueba en `docs/TESTING.md`: 85 (CP-001 a CP-085).
+- Casos de prueba en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas): 85 (CP-001 a CP-085).
 - Todo requerimiento tiene al menos un caso (columna "Casos") y todo caso apunta a un requerimiento existente. La matriz se revisa antes de la entrega.
 
 ## 4. Supuestos y pendientes
 
 - Formatos de documento de hoy: PDF, DOCX y TXT. CSV, XLSX y MD del plan original quedan fuera hasta recibir R01 a R07.
-- Límite de tamaño de 20 MB tomado de `docs/PLAN.md`; confirmar contra el valor implementado.
+- Límite de tamaño de 20 MB tomado del plan inicial (retirado); confirmar contra el valor implementado.
 - Limitaciones de datos aceptadas (ADR 0001): sin especialidades, EPS, cupos, horarios ni disponibilidad en tiempo real.
 - RF-024 depende de que Meta apruebe la plantilla `sedes_salud_v1` (enviada el 2026-10-09, pendiente de aprobación). Sin aprobación, o si Meta la recategoriza a MARKETING, los envíos fallan con `no_disponible`.

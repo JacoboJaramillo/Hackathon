@@ -212,4 +212,4 @@ Al cerrarse una sesión por cualquier motivo, el servidor termina las dos conexi
 
 El orden exacto de `ConversationText`, `AgentThinking` y `AgentStartedSpeaking` lo decide Deepgram; la interfaz debe tolerar variaciones.
 
-El diagrama de secuencia completo, incluidos Deepgram, DeepSeek y datos.gov.co, está en `docs/diagrams/secuencia-voz.mmd` y en `docs/ARCHITECTURE.md` sección 5.
+El diagrama de secuencia completo, incluidos Deepgram, DeepSeek y datos.gov.co, está en `docs/ARQUITECTURA.md` sección 3.4 (imágenes en `docs/diagrams/img/`).

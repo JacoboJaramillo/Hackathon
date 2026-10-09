@@ -8,7 +8,7 @@ Reto 01 Agente Vocal Cognitivo, Kognia Labs (hackathon)
 
 Fecha: 9 de octubre de 2026
 
-Versión: 0.1.0 (web/package.json). Commit: b7507a9 feat: redesigned interface with a voice waveform and a clear hierarchy
+Versión: 0.1.0 (web/package.json). Commit: 6eb3dd7 fix: WhatsApp sends right after the number is confirmed; deliverables published as Markdown
 
 **Presentado por Daniel Fajardo y Jacobo Jaramillo, en representación de SOLUTIONS TECH WEB SAS**
 
@@ -225,7 +225,7 @@ Un solo proceso Node 24 en un solo contenedor sirve las páginas Next.js, la car
 | ESLint | 9.39.5 (rango ^9), eslint-config-next 15.5.27 | lockfile |
 | postcss (override) | 8.5.29 | package.json overrides |
 | Pruebas unitarias | node:test (stdlib de Node) | npm test |
-| Pruebas de carga | k6 2.2.0 (imagen grafana/k6:2.2.0) | docs/CAPACITY.md |
+| Pruebas de carga | k6 2.2.0 (imagen grafana/k6:2.2.0) | sección 10 de este documento |
 | STT | Deepgram nova-3, español | agent-settings.mjs, diarize.mjs |
 | LLM | DeepSeek deepseek-chat (endpoint compatible OpenAI) | agent-settings.mjs |
 | TTS | Deepgram aura-2-celeste-es | agent-settings.mjs |
@@ -307,7 +307,7 @@ Errores de la herramienta buscar_sedes: parametros_invalidos, municipio_no_encon
 
 ## 7. Modelo de datos
 
-No hay base de datos. Todo el estado vive en memoria de la instancia y se pierde al reciclarla. Detalle y diagrama ER en docs/DATA-MODEL.md.
+No hay base de datos. Todo el estado vive en memoria de la instancia y se pierde al reciclarla. El detalle por almacén está en la tabla siguiente.
 
 **Tabla 14. Almacenes en memoria**
 
@@ -363,7 +363,7 @@ Datos sensibles: audio (solo en tránsito hacia Deepgram), texto de documentos (
 | M1 cerco del documento rompible | fenceSafe neutraliza variantes de la etiqueta |
 | M2 limitador sin poda y evasión IPv6 | Poda por minuto y clave por /64 |
 
-Verificado en producción (docs/TESTING.md): Origin ajeno 403, tercera sesión 429, frame de 65 KB cierra con 1009, texto desconocido 1008; cabeceras presentes; /.env, /.git/config, /package.json, /server.mjs y .map responden 404; sin violaciones CSP; gitleaks limpio y npm audit con 0 vulnerabilidades. Pendientes: parte de CP-044 a CP-065 y el break test manual.
+Verificado en producción (registro de pruebas en el historial de git de docs/TESTING.md, commit 6eb3dd7): Origin ajeno 403, tercera sesión 429, frame de 65 KB cierra con 1009, texto desconocido 1008; cabeceras presentes; /.env, /.git/config, /package.json, /server.mjs y .map responden 404; sin violaciones CSP; gitleaks limpio y npm audit con 0 vulnerabilidades. Pendientes: parte de CP-044 a CP-065 y el break test manual.
 
 ### 8.4 Deuda de seguridad
 
@@ -471,7 +471,7 @@ Cloud Run conserva las revisiones anteriores. Para volver atrás: gcloud run ser
 - min-instances 0 fuera de la ventana del jurado; max-instances 2 como techo de costo; 1 vCPU y 1 GiB.
 - Costo dominante: minutos de Deepgram (agente y STT diarizado) y turnos de DeepSeek por sesión; WhatsApp por mensaje.
 - Alerta de presupuesto pendiente (cuenta de facturación compartida).
-- Desmontaje al terminar el evento: gcloud projects delete agente-vocal-hackaton y revocación de las claves de Deepgram, DeepSeek, datos.gov.co y el token de WhatsApp (docs/PLAN.md sección 7).
+- Desmontaje al terminar el evento: gcloud projects delete agente-vocal-hackaton y revocación de las claves de Deepgram, DeepSeek, datos.gov.co y el token de WhatsApp (sección 9.9 de este documento).
 
 ## 10. Capacidad y rendimiento
 
@@ -526,10 +526,10 @@ Medido en producción sobre 6 interrupciones con el agente hablando: del inicio 
 | Unitarias (node:test) | web/server/*.test.mjs | 78 definidas: 74 pasan, 4 en vivo omitidas sin LIVE=1 y claves, 0 fallos |
 | Integración contra producción | web/tests/integration/proxy.test.mjs | 16 pruebas: carga de documento, voz con y sin documento, diarización y sentimiento, AskText, límites |
 | Carga, estrés, picos, capacidad | web/tests/load/*.js (k6) | Ver sección 10 |
-| Seguridad | CI (gitleaks, npm audit), docs/TESTING.md | Verificaciones en producción aprobadas; break test manual pendiente |
-| Funcionales y conversación | docs/TESTING.md, docs/QA-CONVERSACIONES.md | 85 casos CP-001 a CP-085 trazados a requerimientos |
+| Seguridad | CI (gitleaks, npm audit), historial de git de docs/TESTING.md | Verificaciones en producción aprobadas; break test manual pendiente |
+| Funcionales y conversación | historial de git de docs/TESTING.md (commit 6eb3dd7), docs/QA-CONVERSACIONES.md | 85 casos CP-001 a CP-085 trazados a requerimientos |
 
-Las pruebas llevan el ID del requerimiento en el nombre. El plan completo está en docs/TEST-PLAN.md y la matriz en docs/TRACEABILITY.md. Para las pruebas de audio (latencia, interrupción, diarización) ver el documento de reporte de pruebas de audio.
+Las pruebas llevan el ID del requerimiento en el nombre. El registro detallado de casos y resultados R-xxx está en el historial de git de docs/TESTING.md (última versión en el commit 6eb3dd7) y la matriz en docs/TRACEABILITY.md. Para las pruebas de audio (latencia, interrupción, diarización) ver docs/PRUEBAS-AUDIO.md.
 
 ## 12. Riesgos conocidos y deuda técnica
 
@@ -559,12 +559,12 @@ Las pruebas llevan el ID del requerimiento en el nombre. El plan completo está 
 |-- .github/workflows/ci.yml
 |-- infra/deploy.sh
 |-- docs/
-|   |-- ARCHITECTURE.md, CAPACITY.md, DATA-MODEL.md, INTEGRATIONS.md, PLAN.md
-|   |-- REQUIREMENTS.md, SECURITY.md, TEST-PLAN.md, TESTING.md, TRACEABILITY.md
+|   |-- ARQUITECTURA.md, PRUEBAS-AUDIO.md
+|   |-- REQUIREMENTS.md, SECURITY.md, TRACEABILITY.md
 |   |-- GUIA-QA.md, QA-CONVERSACIONES.md
 |   |-- adr/0001 a 0004
 |   |-- api/openapi.yaml, api/websocket-protocol.md
-|   |-- diagrams/*.mmd
+|   |-- diagrams/code/build.py, diagrams/img/*.png
 |   `-- entregables/ (este documento y su generador)
 `-- web/
     |-- Dockerfile, .dockerignore, package.json, package-lock.json

@@ -2,9 +2,9 @@
 
 Proyecto de hackathon. Equipo: 1 desarrollador + 1 QA. Este archivo es la fuente de verdad de las reglas del proyecto.
 
-Producto: Reto 01 de Kognia Labs, Agente Vocal Cognitivo. Es un agente de voz que habla sobre un documento subido en vivo y consulta por API el dataset de IPS de datos.gov.co, con transcripción diarizada y panel de sentimiento. Misión del agente: "¿Dónde me atienden?", orientar al ciudadano sobre en qué sede de su municipio recibir la atención que necesita (ver `docs/adr/0001-mision-del-agente.md`). Requerimientos en `V2.xlsx`; plan, requerimientos inferidos y arquitectura en `docs/PLAN.md`.
+Producto: Reto 01 de Kognia Labs, Agente Vocal Cognitivo. Es un agente de voz que habla sobre un documento subido en vivo y consulta por API el dataset de IPS de datos.gov.co, con transcripción diarizada y panel de sentimiento. Misión del agente: "¿Dónde me atienden?", orientar al ciudadano sobre en qué sede de su municipio recibir la atención que necesita (ver `docs/adr/0001-mision-del-agente.md`). Requerimientos en `V2.xlsx`; plan, requerimientos inferidos y arquitectura en `docs/ARQUITECTURA.md`.
 
-Despliegue: Google Cloud Run, proyecto `agente-vocal-hackaton` (creado solo para el evento), región `us-east1`. Los secretos van en Secret Manager. Al terminar el evento se desmonta todo (ver `docs/PLAN.md`, sección 7).
+Despliegue: Google Cloud Run, proyecto `agente-vocal-hackaton` (creado solo para el evento), región `us-east1`. Los secretos van en Secret Manager. Al terminar el evento se desmonta todo (ver `docs/ARQUITECTURA.md`, sección 9.9 Costos y desmontaje).
 
 ## 1. Skills y herramientas obligatorias
 
@@ -104,17 +104,16 @@ Mínima, viva y en el repositorio. Nada que se desactualice en horas.
 |---|---|
 | `README.md` | Qué es, cómo levantarlo con un comando, variables de entorno requeridas, cómo correr pruebas. |
 | `CLAUDE.md` | Este archivo. Reglas para el agente. |
-| `docs/ARCHITECTURE.md` | Diagrama de módulos, responsabilidades, flujo de datos, límites de confianza. |
+| `docs/ARQUITECTURA.md` | Arquitectura completa: módulos, flujo de datos, límites de confianza, integraciones, modelo de datos, DevOps, capacidad, resumen de seguridad y pruebas. |
 | `docs/adr/NNNN-titulo.md` | Una decisión por archivo (contexto, decisión, consecuencias). Obligatorio para stack, arquitectura y autenticación. |
 | `docs/api/openapi.yaml` | Contrato de la API. Fuente de verdad, se escribe antes del código. |
 | `docs/SECURITY.md` | Modelo de amenazas breve, controles implementados, resultados de auditoría, deuda de seguridad conocida. |
 | `docs/REQUIREMENTS.md` | Requerimientos con ID único (RF-001 funcionales, RNF-001 no funcionales), prioridad y criterio de aceptación. Pendiente de recibir. |
 | `docs/TRACEABILITY.md` | Matriz de trazabilidad (ver sección 5.3). |
-| `docs/DATA-MODEL.md` | Diagrama entidad-relación, diccionario de datos, reglas de integridad y retención. |
-| `docs/INTEGRATIONS.md` | Servicios externos y entre módulos: dirección, protocolo, autenticación, datos, manejo de fallos. |
-| `docs/diagrams/` | Fuentes de los diagramas (`.json` de FossFLOW, `.mmd` de Mermaid) y sus exportaciones. |
-| `docs/TEST-PLAN.md` | Plan de pruebas profesional (ver sección 5.4). |
-| `docs/TESTING.md` | Ejecución del QA: casos, matriz de roles, break test, resultados. |
+| `docs/diagrams/` | Generador de los diagramas (`code/build.py`) y sus imágenes (`img/*.png`). |
+| `docs/PRUEBAS-AUDIO.md` | Reporte de pruebas de audio y voz con lista de verificación. |
+| `docs/QA-CONVERSACIONES.md` | Guion de frases para intentar romper el agente. |
+| `docs/entregables/` | Documentos Word entregables y los scripts que los generan. |
 | `docs/GUIA-QA.md` | Bitácora por commit: qué se hizo y cómo probarlo paso a paso. Es lo primero que lee el QA. |
 | `.env.example` | Todas las variables con valores falsos. Nunca valores reales. |
 | `CHANGELOG.md` | Cambios por versión. |
@@ -123,7 +122,7 @@ Mínima, viva y en el repositorio. Nada que se desactualice en horas.
 
 - **FossFLOW** (diagramas isométricos, MIT, PWA con soporte offline) para presentar la arquitectura y las integraciones. Se usa en el repositorio indicado (`github.com/victortassinari/FossFLOW`); el proyecto original es `stan-smith/FossFLOW`. Local: `git clone`, `npm install`, `npm run build:lib`, `npm run dev` en `http://localhost:3000`. Docker: `docker compose up`, guarda en `./diagrams`. Exporta e importa JSON.
 - FossFLOW es una herramienta de diagramas de infraestructura, no de entidad-relación. El modelo de datos se mantiene como **Mermaid `erDiagram`** (texto versionable, se renderiza en GitHub) y, para la presentación, se muestra además una vista FossFLOW de los almacenes de datos y sus conexiones. Fuente de verdad: el ER en Mermaid.
-- Los JSON de FossFLOW y los `.mmd` se guardan en `docs/diagrams/`. Se exporta imagen de cada diagrama para el README y las diapositivas.
+- El generador de diagramas y sus imágenes se guardan en `docs/diagrams/`. Se exporta imagen de cada diagrama para el README y las diapositivas.
 - Diagramas mínimos: contexto del sistema, contenedores/módulos, flujo de datos con límites de confianza, despliegue, secuencia de los flujos críticos (login, flujo principal del producto), integraciones, modelo de datos.
 
 ### 5.2 Documentación técnica que se presenta
@@ -147,7 +146,7 @@ Orden de la presentación: problema, requerimientos, arquitectura (recorrido sob
 
 ### 5.4 Plan de pruebas
 
-`docs/TEST-PLAN.md` contiene: alcance, estrategia, entornos, datos de prueba, roles, criterios de entrada y salida, gestión de defectos (severidad y prioridad), riesgos, métricas y reporte. Tipos de prueba y herramientas sugeridas:
+El plan de pruebas (en `docs/ARQUITECTURA.md` sección 11) contiene: alcance, estrategia, entornos, datos de prueba, roles, criterios de entrada y salida, gestión de defectos (severidad y prioridad), riesgos, métricas y reporte. Tipos de prueba y herramientas sugeridas:
 
 | Tipo | Objetivo | Herramienta sugerida |
 |---|---|---|
@@ -212,7 +211,7 @@ Reglas:
 
 ## 8. Pendientes de decisión
 
-- Propuesto en `docs/PLAN.md`, pendiente de confirmar: FastAPI (Python) + React, monolito modular en un servicio de Cloud Run, sin base de datos (vectores en memoria).
+- Propuesto en `docs/ARQUITECTURA.md`, pendiente de confirmar: FastAPI (Python) + React, monolito modular en un servicio de Cloud Run, sin base de datos (vectores en memoria).
 - Proveedores: STT Deepgram (diarización); LLM Claude Haiku 5.5 o Gemini Flash vía Vertex; TTS ElevenLabs Flash, Deepgram Aura o Cartesia.
 - Faltan R01 a R07, el 30 % de los criterios y la hoja "02 CRITERIOS" del Excel.
 - Al decidirlos: registrar un ADR, actualizar este archivo y correr `/graphify`.

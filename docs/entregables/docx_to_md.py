@@ -9,7 +9,7 @@ from docx.text.paragraph import Paragraph
 
 ROOT = Path(__file__).resolve().parents[2]
 JOBS = [
-    ("docs/entregables/Arquitectura-y-DevOps.docx", "docs/ARQUITECTURA-Y-DEVOPS.md"),
+    ("docs/entregables/Arquitectura-y-DevOps.docx", "docs/ARQUITECTURA.md"),
     ("docs/entregables/Reporte-Pruebas-Audio.docx", "docs/PRUEBAS-AUDIO.md"),
 ]
 

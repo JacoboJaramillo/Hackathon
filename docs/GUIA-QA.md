@@ -43,8 +43,30 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: keep two main documents (architecture and audio tests) and remove superseded docs
+Fecha: 2026-10-09, 14:50.
+
+Qué se hizo:
+- La documentación queda centrada en dos documentos completos:
+  - `docs/ARQUITECTURA.md`: arquitectura, DevOps, integraciones, datos, capacidad, seguridad y riesgos, con los 6 diagramas.
+  - `docs/PRUEBAS-AUDIO.md`: checklist de las 22 pruebas de audio con sus resultados reales.
+- Se eliminaron por estar cubiertos por esos dos documentos o desactualizados: `PLAN.md`, `ARCHITECTURE.md`, `INTEGRATIONS.md`, `DATA-MODEL.md`, `CAPACITY.md`, `TEST-PLAN.md`, `TESTING.md`, `ARQUITECTURA-VISUAL.md` y los `.mmd`.
+- El detalle de los 85 casos y los resultados R-001 a R-023 sigue en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7).
+- Se conservan: `SECURITY.md`, `REQUIREMENTS.md`, `TRACEABILITY.md`, `adr/`, `api/`, `GUIA-QA.md`, `QA-CONVERSACIONES.md` y `entregables/`.
+- Enlaces corregidos en el README, `CLAUDE.md` (tabla de documentación), los ADR, la API, requisitos, seguridad, trazabilidad y QA-CONVERSACIONES. Un script revisó todos los enlaces relativos y no encontró ninguno roto.
+- Los `.docx` se regeneraron con las referencias nuevas y se copiaron a Descargas.
+
+Cómo probarlo:
+1. Abrir el repositorio en GitHub y recorrer el README: cada enlace debe abrir un archivo existente.
+2. Abrir `docs/ARQUITECTURA.md` y `docs/PRUEBAS-AUDIO.md`: deben verse las tablas y las figuras.
+3. Para consultar un caso antiguo, por ejemplo CP-030: `git show 6eb3dd7:docs/TESTING.md`.
+
+Qué no se puede probar todavía y por qué: nada pendiente.
+
+Riesgos conocidos: las entradas antiguas de esta guía y del CHANGELOG mencionan archivos que ya no existen; son registro histórico y no se reescriben.
+
 ### fix: WhatsApp sends right after the number is confirmed; deliverables published as Markdown
-Fecha: 2026-10-09, 14:55.
+Fecha: 2026-10-09, 14:40.
 
 Qué se hizo:
 - Gabriela ya no pide una segunda confirmación antes de enviar por WhatsApp. Cuando la persona dice que el número repetido es correcto, envía de inmediato. Si no dijo cuáles sedes quiere, envía las tres que mencionó, sin preguntar.

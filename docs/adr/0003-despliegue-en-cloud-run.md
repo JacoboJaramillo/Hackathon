@@ -43,4 +43,4 @@ Región `us-east1`: los proveedores de IA (Deepgram, DeepSeek a través de Deepg
 - La afinidad de sesión de Cloud Run es de mejor esfuerzo: si la instancia se reemplaza, la sesión se pierde y el usuario reconecta.
 - Una sola región: una caída de `us-east1` deja el servicio caído. Aceptado para un evento de un día.
 - Con `min-instances` 0 la primera petición tras un periodo sin tráfico sufre arranque en frío; se sube a 1 antes de la evaluación y se baja después.
-- Desmontaje en un paso: borrar el proyecto elimina servicio, imágenes y secretos; después se revocan las claves en los proveedores (`docs/PLAN.md` sección 7).
+- Desmontaje en un paso: borrar el proyecto elimina servicio, imágenes y secretos; después se revocan las claves en los proveedores (`docs/ARQUITECTURA.md` sección 9.9).

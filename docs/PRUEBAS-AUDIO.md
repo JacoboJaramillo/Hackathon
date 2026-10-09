@@ -10,7 +10,7 @@ Reto 01 Agente Vocal Cognitivo, Kognia Labs
 
 Fecha: 9 de octubre de 2026
 
-Commit: b7507a9 feat: redesigned interface with a voice waveform and a clear hierarchy
+Commit: 6eb3dd7 fix: WhatsApp sends right after the number is confirmed; deliverables published as Markdown
 
 Producción: https://agente-vocal-583590264456.us-east1.run.app
 
@@ -254,7 +254,7 @@ Pasos: Subir un documento y tocar una sugerencia.
 
 Esperado: Respuesta con "según tu documento"; en la transcripción aparece "Tú (pregunta tocada)".
 
-Obtenido: No hay ejecución registrada en TESTING.md.
+Obtenido: No hay ejecución registrada (ver historial de git de TESTING.md).
 
 Evidencia: docs/GUIA-QA.md, commit del rediseño de Gabriela (12:18).
 
@@ -280,7 +280,7 @@ Esperado: Llega un solo mensaje con las sedes de la última búsqueda.
 
 Obtenido: No ejecutado; depende de la plantilla aprobada y de la configuración en producción. CP-078 a CP-085 pendientes.
 
-Evidencia: docs/TESTING.md sección 12 bis.
+Evidencia: Historial de git de docs/TESTING.md (commit 6eb3dd7), sección 12 bis.
 
 ### 4.17 V-17 Pruebas unitarias del servidor (incluye WhatsApp) (Aprobada)
 
@@ -316,7 +316,7 @@ Esperado: "Llama al 123" antes de cualquier sede en 5 de 5.
 
 Obtenido: No ejecutado (CP-005).
 
-Evidencia: docs/TESTING.md sección 2.
+Evidencia: Historial de git de docs/TESTING.md (commit 6eb3dd7), sección 2.
 
 ### 4.20 V-20 Resto de casos de misión por voz (Pendiente)
 
@@ -324,11 +324,11 @@ Objetivo: Cubrir gravedad, especialidades, alcance, temas fuera de misión, priv
 
 Pasos: CP-006 a CP-011, CP-013 a CP-018 y CP-021 con micrófono real.
 
-Esperado: Cada caso según su criterio en TESTING.md.
+Esperado: Cada caso según su criterio (historial de git de TESTING.md, commit 6eb3dd7).
 
 Obtenido: No ejecutados.
 
-Evidencia: docs/TESTING.md secciones 2 y 3.
+Evidencia: Historial de git de docs/TESTING.md (commit 6eb3dd7), secciones 2 y 3.
 
 ### 4.21 V-21 Compatibilidad de navegadores (Parcial)
 
