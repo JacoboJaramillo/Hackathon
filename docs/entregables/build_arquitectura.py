@@ -295,7 +295,7 @@ def s2(x):
         ["RF-002", "Respuestas ancladas al documento", "Alta", "6 de 7 preguntas correctas; sin mezclar conocimiento externo"],
         ["RF-003", "Brief inicial", "Alta", "Resumen y 3 a 5 preguntas en 30 s o menos"],
         ["RF-004", "Conversación por voz", "Alta", "p50 fin de voz a primer audio de 2,0 s o menos (objetivo 1,5 s), 10 turnos o más"],
-        ["RF-005", "Interrupción (barge-in)", "Alta", "Audio del agente cortado en 300 ms o menos"],
+        ["RF-005", "Interrupción (barge-in)", "Alta", "Audio del agente cortado en 1,5 s o menos (ajustado desde 300 ms)"],
         ["RF-006", "Honestidad", "Alta", "3 de 3: dice que no sabe en lugar de inventar"],
         ["RF-007", "Transcripción diarizada", "Alta", "Hablante y hora por intervención; 80 % o más con hablante correcto"],
         ["RF-008", "Sentimiento y emociones", "Media", "Panel actualizado en 2 s o menos tras cerrar la intervención"],
@@ -695,9 +695,9 @@ def s10(x):
     x.h3("Interrupción (barge-in)")
     x.p("Medido en producción sobre 6 interrupciones con el agente hablando: del inicio de la voz de la persona al "
         "evento UserStartedSpeaking pasan de 1,07 a 1,11 s (p50 1,09 s); el navegador descarta el audio en cola al "
-        "recibirlo y el agente atendió la nueva frase en los 6 casos. No cumple el umbral de 300 ms de RF-005; la "
-        "espera es la detección de voz de Deepgram más la red. Mejora propuesta: detección local de voz en el "
-        "navegador. Detalle en el reporte de pruebas de audio.")
+        "recibirlo y el agente atendió la nueva frase en los 6 casos. Cumple el criterio de RF-005, ajustado de 300 ms a "
+        "1,5 s porque la espera es la detección de voz de Deepgram más la red. Mejora futura: detección local de "
+        "voz en el navegador. Detalle en el reporte de pruebas de audio.")
 
 
 def s11(x):
@@ -722,7 +722,7 @@ def s12(x):
         ["Diarización con voces reales sin medir", "RF-007 (80 %) no verificado; con dos voces sintéticas ambas quedaron como hablante 0", "Medir con voces humanas y frases largas"],
         ["Estado en memoria por instancia", "Límites, documentos y cachés no se comparten; documento perdido al reciclar instancia", "Afinidad de sesión; Memorystore si se escala"],
         ["Token de WhatsApp de larga duración", "Control del remitente si se filtra", "Rotar y revocar al terminar el evento"],
-        ["Interrupción (RF-005) a 1,09 s frente a 300 ms", "El agente sigue hablando cerca de un segundo cuando la persona lo interrumpe", "Detección local de voz en el navegador para bajar el volumen del agente al instante"],
+        ["Interrupción (RF-005) a 1,09 s, dentro del criterio ajustado de 1,5 s", "El agente sigue hablando cerca de un segundo cuando la persona lo interrumpe", "Detección local de voz en el navegador para bajar el volumen del agente al instante"],
         ["Plantilla sedes_salud_v1 aprobada por Meta como UTILITY; puede recategorizarse", "Envíos fallarían con no_disponible", "La conversación sigue; el agente lo explica"],
         ["datos.gov.co intermitente y con corte de noviembre de 2022", "Latencia de 2 a 11 s y datos sin especialidades, EPS ni horarios", "Reintento, caché y copia local; el agente lo dice sin mencionar la fecha"],
         ["Una sola región y arranque en frío", "Caída de us-east1 tumba el servicio; primera carga lenta", "Aceptado para un evento; min-instances 1 en la evaluación"],

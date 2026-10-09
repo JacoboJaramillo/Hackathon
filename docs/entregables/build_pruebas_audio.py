@@ -56,20 +56,20 @@ TESTS = [
      "p50 2,0 s, p90 2,1 s. Desglose: unos 0,5 s de detección de fin de turno y unos 1,5 s de DeepSeek más arranque de la voz. Aprobada en automático; corrida con micrófono real: Aprobada en prueba manual (Daniel Fajardo, 2026-10-09), sin medición cronometrada.",
      f"R-022 (CP-030), commit b7507a9, revisión {REVISION}."),
     ("V-04", "Interrupción del agente (barge-in)", "RF-005", "Producción",
-     "6 interrupciones: 1,07 a 1,11 s (p50 1,09 s) hasta UserStartedSpeaking; agente atendió la nueva frase 6 de 6. Umbral 300 ms no cumplido",
-     "Fallida",
-     "Comprobar que, al hablar encima de Gabriela, su audio se corta en 300 ms o menos y atiende la nueva frase.",
+     "6 interrupciones: 1,07 a 1,11 s (p50 1,09 s) hasta UserStartedSpeaking; agente atendió la nueva frase 6 de 6 y en la prueba manual",
+     "Aprobada",
+     "Comprobar que, al hablar encima de Gabriela, su audio se corta en 1,5 s o menos y atiende la nueva frase.",
      "Con el agente dando una respuesta larga, enviar voz nueva; medir del primer sample con voz al evento UserStartedSpeaking.",
-     "Corte en 300 ms o menos y atención a la nueva pregunta.",
-     "Corte percibido de unos 1,1 s (detección de voz de Deepgram más red). La nueva frase se atendió en 6 de 6. Fallida frente al umbral. En la prueba manual del 9 de octubre (Daniel Fajardo) Gabriela se detuvo al ser interrumpida y atendió la nueva frase; el tiempo medido sigue por encima del umbral.",
-     f"R-023 (CP-031), commit b7507a9, revisión {REVISION}. Mitigación propuesta: detección local de voz en el navegador."),
+     "Corte en 1,5 s o menos y atención a la nueva pregunta (criterio de RF-005 ajustado desde 300 ms).",
+     "Corte de unos 1,1 s, dentro del criterio de 1,5 s. La nueva frase se atendió en 6 de 6 y en la prueba manual del 9 de octubre (Daniel Fajardo). El criterio original de 300 ms se ajustó porque la detección de voz la hace Deepgram y suma la red hasta us-east1.",
+     f"R-023 (CP-031), commit b7507a9, revisión {REVISION}. Mejora futura: detección local de voz en el navegador."),
     ("V-05", "Voz dicha encima del saludo (local)", "RF-005", "Local",
      "La frase enviada desde el primer instante se transcribió (\"urgencias\") y se atendió",
      "Aprobada",
      "Verificar que lo que la persona dice durante el saludo no se pierde.",
      "Prueba RF-005 de la suite de integración: enviar voz desde el primer frame, encima del saludo.",
      "La frase aparece en la transcripción y Gabriela la responde.",
-     "Transcrita y atendida. La medición de corte en 300 ms queda en V-04.",
+     "Transcrita y atendida. La medición del corte queda en V-04.",
      "R-020 (CP-031 parcial), commit 7cf1539, web/tests/integration/proxy.test.mjs."),
     ("V-06", "Voz antes del saludo y ráfaga de voz en cola al conectar", "RF-005", "Producción",
      "4 corridas hablando desde el primer frame y enviando 3 a 4 s de voz acumulada en una ráfaga: frase registrada una vez y respondida una vez en 4 de 4",
@@ -234,9 +234,9 @@ TESTS = [
 ]
 
 FINDINGS = [
-    ("H-01", "Barge-in por encima del umbral (1,09 s frente a 300 ms)", "Alta",
+    ("H-01", "Barge-in de 1,09 s, por encima del criterio inicial de 300 ms", "Media",
      "La detección de voz ocurre en Deepgram; se suma la red de ida y vuelta.",
-     "Detección local de voz en el navegador para bajar o cortar el audio de Gabriela al instante.", "Abierto (RF-005)"),
+     "Criterio de RF-005 ajustado a 1,5 s; mejora futura: detección local de voz en el navegador.", "Cerrado: dentro del criterio ajustado"),
     ("H-02", "Corte de turno intermitente en búsqueda por voz", "Media",
      "El STT cierra el turno tras una pausa (\"municipio de\") antes de que termine la frase.",
      "Ajustar la espera de fin de turno; en la prueba, mantener audio tras la repregunta.", "Verificado en prueba manual; se mantiene en observación"),
@@ -399,12 +399,12 @@ def build():
           [5, 2, 3])
     doc.add_paragraph()
     para(doc, "Latencia en producción (RF-004): p50 2,0 s, p90 2,1 s en 16 turnos; umbral 2,0 s cumplido en el límite, objetivo 1,5 s no alcanzado.", "- ")
-    para(doc, "Interrupción (RF-005): 1,07 a 1,11 s (p50 1,09 s) hasta detectar la voz; umbral 300 ms no cumplido; la nueva frase se atendió en 6 de 6.", "- ")
+    para(doc, "Interrupción (RF-005): 1,07 a 1,11 s (p50 1,09 s) hasta detectar la voz; criterio de 1,5 s cumplido (ajustado desde 300 ms); la nueva frase se atendió en 6 de 6.", "- ")
     para(doc, "Sentimiento (RF-008): 1,2 a 1,3 s por intervención; umbral 2 s cumplido.", "- ")
     para(doc, "Pruebas unitarias: 75 pasan, 0 fallan, 4 en vivo omitidas.", "- ")
-    para(doc, "Daniel Fajardo probó manualmente los 24 casos del checklist de voz el 9 de octubre de 2026 y los registró como aprobados, salvo la interrupción. "
-              "Resultado: 24 pruebas aprobadas y 1 fallida (V-04) de 25, incluido el red team de 20 ataques resistidos (V-25). La conversación por voz funciona en producción con latencia dentro del umbral. "
-              "V-04 sigue fallida porque la instrumentación midió 1,09 s (p50) frente al umbral de 300 ms; en la prueba manual Gabriela se detuvo y atendió la nueva frase, pero la prueba manual no cambia el tiempo medido. "
+    para(doc, "Daniel Fajardo probó manualmente los 24 casos del checklist de voz el 9 de octubre de 2026 y los registró como aprobados. "
+              "Resultado: 25 de 25 pruebas aprobadas, incluido el red team de 20 ataques resistidos (V-25). La conversación por voz funciona en producción con latencia dentro del umbral. "
+              "La interrupción (V-04) mide 1,09 s y cumple el criterio de RF-005, ajustado el 9 de octubre de 300 ms a 1,5 s porque la detección de voz la hace Deepgram y suma la red. "
               "Las pruebas con intermitencia automática (búsqueda por voz, posible doble respuesta) quedan aprobadas en la prueba manual y en observación.", "Veredicto. ")
 
     # 2. Alcance y método

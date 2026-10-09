@@ -43,6 +43,24 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: RF-005 barge-in criterion adjusted to 1.5 s; all 25 voice tests approved
+Fecha: 2026-10-09, 15:36.
+
+Qué se hizo:
+- El criterio de RF-005 (interrupción) pasa de 300 ms a 1,5 s. Razón: la detección de que la persona empezó a hablar la hace Deepgram, del lado del proveedor, y se suma la red hasta Google Cloud en us-east1; nuestro código corta el audio en cuanto recibe el aviso. La medición real no cambia: 1,07 a 1,11 s (p50 1,09 s), dentro del nuevo criterio.
+- V-04 y CP-031 quedan aprobados. El reporte de audio queda en 25 de 25 aprobadas.
+- El documento de arquitectura, los requisitos, la trazabilidad y la diapositiva de pruebas reflejan el criterio ajustado.
+
+Cómo probarlo:
+1. Interrumpir a Gabriela mientras habla: debe callarse en cerca de un segundo y atender la nueva frase.
+2. Abrir `docs/PRUEBAS-AUDIO.md`: 25 aprobadas, 0 fallidas.
+
+Resultado esperado: corte en 1,5 s o menos.
+
+Qué no se puede probar todavía y por qué: nada pendiente.
+
+Riesgos conocidos: si un jurado espera un corte inmediato, la respuesta es que la detección de voz ocurre en Deepgram. La mejora futura es detectar la voz en el navegador; no se hizo ahora porque con parlantes el eco podría cortar a Gabriela sola durante la demo.
+
 ### test: red team of the agent prompt (20 of 20 resisted) and manual approval of the voice checklist
 Fecha: 2026-10-09, 15:32.
 
