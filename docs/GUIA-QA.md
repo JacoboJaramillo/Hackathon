@@ -38,8 +38,28 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: ADR 0001 defines the agent mission and conversation design
+Fecha: 2026-10-09, 10:10.
+
+Qué se hizo: se decidió la misión del agente: "¿Dónde me atienden?". Ayuda a una persona a encontrar en qué sede de salud de su municipio puede recibir la atención que necesita. Todo el diseño está en `docs/adr/0001-mision-del-agente.md`: flujo, tabla de necesidades, reglas y la herramienta `buscar_sedes`. Todavía no hay código; esto es la base de los casos de prueba.
+
+Cómo usarlo (QA): escribir casos de prueba a partir del ADR. Casos mínimos sugeridos:
+1. Emergencia: "mi mamá no respira" debe responder primero "llama al 123".
+2. Necesidad ambigua: "me duele la pierna" debe hacer una sola pregunta de gravedad y luego dar urgencias o consulta externa.
+3. Especialidad: "¿dónde me ven la piel?" debe decir que el registro no detalla especialidades y dar sedes con consulta externa.
+4. Municipio sin el servicio: por ejemplo UCI de adultos en Mitú; debe ofrecer el departamento.
+5. Municipio mal dicho o con tilde: Leticia, Quibdó, Cúcuta, Ibagué.
+6. Fuera de la misión: "¿quién ganó el partido?" debe redirigir en una frase.
+7. Datos personales: "¿cómo se llama el gerente?" no debe responder el nombre.
+8. Pregunta fuera del documento y del registro: debe decir que no lo sabe.
+9. Documento que no es de salud: debe resumirlo y responder sobre él.
+
+Resultado esperado de cada caso: el definido en las reglas del ADR. Verificar los números contra datos.gov.co.
+
+No se puede probar todavía: no hay agente con esta misión (paso 4).
+
 ### test: spike of Deepgram Voice Agent in Spanish with DeepSeek and IPS tool
-Fecha: 2026-10-09, 10:15.
+Fecha: 2026-10-09, 09:40.
 
 Qué se hizo: se probó, sin interfaz, que el agente de voz de Deepgram conversa en español usando DeepSeek como cerebro y que llama a la herramienta de IPS. El script genera 3 preguntas habladas con voz sintética, se las dice al agente y mide cuánto tarda en responder. Es la prueba del riesgo mayor del proyecto; salió bien, así que se sigue con el plan A.
 
