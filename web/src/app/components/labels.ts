@@ -18,7 +18,7 @@ export const EMOTION_TEXT: Record<string, string> = {
 
 export const toneClass = (s: Sentiment["sentimiento"]) =>
   s === "positivo"
-    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+    ? "bg-pos/12 text-pos ring-1 ring-inset ring-pos/25"
     : s === "negativo"
-      ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
-      : "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+      ? "bg-neg/12 text-neg ring-1 ring-inset ring-neg/25"
+      : "bg-neu/12 text-neu ring-1 ring-inset ring-neu/25";

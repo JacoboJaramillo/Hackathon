@@ -43,6 +43,33 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: redesigned interface with a voice waveform and a clear hierarchy
+Fecha: 2026-10-09, 13:50.
+
+Qué se hizo:
+- Rediseño completo de la interfaz para que se vea como un producto cuidado y no como una página generada por IA. Se aplicaron las reglas de la skill frontend-design de Anthropic y de impeccable.style: sin gradientes, sin orbe, sin antetítulo en mayúsculas y sin tarjetas iguales.
+- Tipografía Schibsted Grotesk (autohospedada, compatible con la CSP). Paleta petróleo con acento ámbar, con modo claro y oscuro y contraste AA calculado.
+- Gabriela ahora es una onda de voz de 41 barras que sigue el audio real. Estados: línea quieta en reposo, barrido gris al conectar, barrido ámbar al pensar y audio real al escuchar y hablar.
+- Jerarquía: la conversación es la columna principal y las sedes van debajo. El documento y el sentimiento quedan como contenido secundario a la izquierda; en móvil el orden es Gabriela, conversación, sedes, documento y sentimiento.
+- Estados vacíos con ejemplos de qué decir. Las sedes aparecen como filas con botones "Cómo llegar" y teléfono de 44 px. El aviso del 123 es un enlace que llama.
+- Corrección propia: en móvil la cuadrícula se salía del ancho y dejaba huecos verticales; se corrigió y se verificó a 360 px.
+
+Cómo probarlo:
+1. Abrir la URL pública en Chrome de escritorio y en un celular.
+2. A 360 px de ancho no debe haber scroll horizontal. Verificado con emulación de DevTools: ancho de documento 360 en claro y en oscuro.
+3. Cambiar el tema del sistema a oscuro y revisar que todo se lea bien.
+4. Pulsar "Hablar con Gabriela": la onda pasa a barrido mientras conecta y luego sigue la voz.
+5. Pedir sedes: aparecen como filas debajo de la conversación, con "Cómo llegar" y el teléfono.
+6. Navegar con Tab: todos los controles muestran un foco visible.
+
+Resultado esperado: mismo funcionamiento que antes, con una interfaz más clara.
+
+Qué no se puede probar todavía y por qué:
+- Los contrastes se calcularon a mano, sin axe ni Lighthouse.
+- La vista con conversación y sedes cargadas solo se ve con una sesión de voz real.
+
+Riesgos conocidos: ninguno de lógica; no se tocó `useVoiceSession.ts` ni el servidor.
+
 ### feat: Gabriela can send up to three sites by WhatsApp, once, on request (RF-024)
 Fecha: 2026-10-09, 13:10.
 

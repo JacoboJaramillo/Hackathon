@@ -66,11 +66,11 @@ export default function DocumentUpload({
   const busy = state.kind === "uploading";
 
   return (
-    <section aria-labelledby="upload-title" className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <h2 id="upload-title" className="text-lg font-semibold">
+    <section aria-labelledby="upload-title" className="border-t border-line pt-5">
+      <h2 id="upload-title" className="text-base font-semibold tracking-tight">
         Tu documento
       </h2>
-      <p className="mt-1 text-sm text-muted">Sube un PDF, DOCX o TXT de hasta 20 MB para que pueda explicártelo.</p>
+      <p className="mt-1 text-sm text-muted">¿Te dieron una orden, un resultado o una carta? Súbela y Gabriela te la explica en palabras simples.</p>
 
       <label
         onDragOver={(e) => {
@@ -83,9 +83,9 @@ export default function DocumentUpload({
           setDragging(false);
           if (!busy) pick(e.dataTransfer.files);
         }}
-        className={`mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center text-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
-          dragging ? "border-accent bg-accent/10" : "border-border"
-        }`}
+        className={`mt-4 flex min-h-24 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border border-dashed px-4 py-3 text-sm transition-colors duration-150 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-ink ${
+          dragging ? "border-accent-ink bg-accent/10" : "border-line-strong hover:border-accent-ink"
+        } ${busy ? "cursor-wait opacity-70" : ""}`}
       >
         <input
           type="file"
@@ -97,16 +97,19 @@ export default function DocumentUpload({
             e.target.value = "";
           }}
         />
-        <span className="font-medium">
-          {state.kind === "ready" ? "Cambiar documento" : "Elige un archivo o arrástralo aquí"}
+        <FileIcon />
+        <span className="flex flex-col">
+          <span className="font-medium">
+            {state.kind === "ready" ? "Cambiar documento" : "Elige un archivo o arrástralo aquí"}
+          </span>
+          <span className="mt-0.5 text-muted">PDF, DOCX o TXT, hasta 20 MB</span>
         </span>
-        <span className="mt-1 text-muted">.pdf, .docx o .txt</span>
       </label>
 
       <div aria-live="polite" className="mt-4 text-sm">
-        {state.kind === "uploading" && <p>Leyendo tu documento...</p>}
+        {state.kind === "uploading" && <p className="text-muted">Leyendo tu documento...</p>}
         {state.kind === "error" && (
-          <p role="alert" className="rounded-lg border border-danger p-3 text-danger">
+          <p role="alert" className="rounded-[var(--radius-control)] border border-danger/50 px-3 py-2.5 text-danger">
             {state.message}
           </p>
         )}
@@ -127,7 +130,7 @@ function Result({ doc, onAsk }: { doc: Created; onAsk: (question: string) => voi
         <>
           <div>
             <h3 className="font-semibold">Resumen</h3>
-            <p className="mt-1">{doc.brief.resumen}</p>
+            <p className="mt-1 leading-relaxed">{doc.brief.resumen}</p>
           </div>
           <div>
             <h3 className="font-semibold">Pregúntale a Gabriela</h3>
@@ -138,9 +141,10 @@ function Result({ doc, onAsk }: { doc: Created; onAsk: (question: string) => voi
                   <button
                     type="button"
                     onClick={() => onAsk(q)}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-left transition hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-left transition-colors duration-150 hover:border-accent-ink hover:text-accent-ink"
                   >
-                    {q}
+                    <span>{q}</span>
+                    <AskIcon />
                   </button>
                 </li>
               ))}
@@ -151,5 +155,23 @@ function Result({ doc, onAsk }: { doc: Created; onAsk: (question: string) => voi
         <p>No pude preparar el resumen, pero ya puedes preguntarme por tu documento.</p>
       )}
     </div>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg className="shrink-0 text-muted" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AskIcon() {
+  return (
+    <svg className="shrink-0 opacity-60" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
   );
 }
