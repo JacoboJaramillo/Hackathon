@@ -74,8 +74,15 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
   const askRef = useRef<((text: string) => void) | null>(null);
   // A question tapped before the session is ready waits for SettingsApplied.
   const pendingAskRef = useRef<string | null>(null);
+  // Tells the open session about a document uploaded after it started.
+  const attachRef = useRef<((docId: string) => void) | null>(null);
+  const latestDocRef = useRef(documentId);
 
   useEffect(() => () => stopRef.current?.(), []);
+  useEffect(() => {
+    latestDocRef.current = documentId;
+    if (documentId) attachRef.current?.(documentId);
+  }, [documentId]);
 
   const start = useCallback(async () => {
     setError(null);
@@ -134,6 +141,7 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
     const ws = new WebSocket(`${proto}://${location.host}/ws/agent${query}`);
     ws.binaryType = "arraybuffer";
     let ready = false;
+    let sessionDoc = documentId;
     const askedTexts = new Set<string>();
     const sendAsk = (text: string) => {
       ws.send(JSON.stringify({ type: "AskText", text }));
@@ -144,6 +152,11 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
     askRef.current = (text) => {
       if (ws.readyState === WebSocket.OPEN && ready) sendAsk(text);
       else pendingAskRef.current = text;
+    };
+    attachRef.current = (docId) => {
+      if (docId === sessionDoc || ws.readyState !== WebSocket.OPEN || !ready) return;
+      sessionDoc = docId;
+      ws.send(JSON.stringify({ type: "AttachDocument", doc: docId }));
     };
 
     const started = Date.now();
@@ -192,6 +205,7 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
       void out.close();
       stopRef.current = null;
       askRef.current = null;
+      attachRef.current = null;
       pendingAskRef.current = null;
     };
 
@@ -254,6 +268,8 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
           break;
         case "SettingsApplied":
           ready = true;
+          // A document uploaded while the session was connecting.
+          if (latestDocRef.current) attachRef.current?.(latestDocRef.current);
           if (pendingAskRef.current) {
             sendAsk(pendingAskRef.current);
             pendingAskRef.current = null;

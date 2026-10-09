@@ -307,6 +307,40 @@ test('RF-002 RF-003 a tapped brief question is answered from the document', { sk
     });
     const answer = said.slice(1).join(' ');
     assert.match(answer, /47|cuarenta y siete/i, answer);
+    assert.match(said[0], /Ya tengo tu documento/, 'greeting acknowledges the document');
+  } finally {
+    clearInterval(pacer);
+    ws.terminate();
+  }
+});
+
+test('RF-002 a document uploaded mid-conversation is announced and used', { skip, timeout: 70_000 }, async () => {
+  await new Promise((r) => setTimeout(r, 1500));
+  const { ws, status } = await open();
+  assert.equal(status, 101);
+  const pacer = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send(Buffer.alloc(FRAME)), 20);
+  const said = [];
+  try {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`timeout; agent said: ${said.join(' | ')}`)), 60_000);
+      let step = 0;
+      ws.on('message', async (data, isBinary) => {
+        if (isBinary) return;
+        const m = JSON.parse(data.toString());
+        if (m.type === 'ConversationText' && m.role === 'assistant') said.push(m.content);
+        if (m.type !== 'AgentAudioDone') return;
+        step += 1;
+        if (step === 1) {
+          const { body } = await upload(FACT_DOC);
+          ws.send(JSON.stringify({ type: 'AttachDocument', doc: body.documentId }));
+        } else if (step === 2) {
+          ws.send(JSON.stringify({ type: 'AskText', text: '¿Cuál es el código de acceso de la bodega?' }));
+        } else { clearTimeout(t); resolve(); }
+      });
+      ws.on('close', (c) => reject(new Error(`closed ${c}`)));
+    });
+    assert.match(said.join(' '), /Recibí tu documento/, said.join(' | '));
+    assert.match(said.slice(2).join(' '), /47|cuarenta y siete/i, said.join(' | '));
   } finally {
     clearInterval(pacer);
     ws.terminate();

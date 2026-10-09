@@ -43,6 +43,26 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: Gabriela knows when a document is uploaded and starts the conversation from it (RF-002)
+Fecha: 2026-10-09, 15:20.
+
+Qué se hizo:
+- Si subes el documento antes de pulsar Hablar, Gabriela saluda: "Hola, soy Gabriela. Ya tengo tu documento. ¿Quieres que te lo explique o tienes una pregunta sobre él?".
+- Si lo subes con la conversación ya abierta, el navegador avisa al servidor (`AttachDocument`). El servidor le pasa el texto del documento a Gabriela (`UpdatePrompt`) y, cuando ella lo tiene, dice: "Recibí tu documento. ¿Quieres que te lo explique o tienes una pregunta sobre él?". La persona no tiene que decir que lo subió.
+- Si sube otro documento, Gabriela responde solo sobre el nuevo. Máximo 3 documentos por conversación.
+- Seguridad: el navegador solo envía el identificador del documento, nunca su texto. El servidor solo acepta documentos que él mismo procesó y todavía guarda, y el texto entra cercado como datos, igual que antes.
+
+Cómo probarlo:
+1. Subir `Nota-medica-Daniel-Fajardo-PRUEBA.docx` y luego pulsar Hablar: el saludo debe decir "Ya tengo tu documento".
+2. Pulsar Hablar sin documento, esperar el saludo y subir el documento: en unos segundos Gabriela dice "Recibí tu documento...". Luego preguntar "¿qué me diagnosticaron?".
+3. Automático: `cd web`, servidor local en el puerto 3100 y `BASE_URL=http://localhost:3100 ORIGIN=http://localhost:3100 node --env-file=../.env --test --test-name-pattern="tapped brief|mid-conversation" tests/integration/proxy.test.mjs`. Resultado de hoy: 2 de 2 pasan.
+
+Resultado esperado: Gabriela siempre sabe que hay un documento sin que la persona lo diga.
+
+Qué no se puede probar todavía y por qué: nada pendiente.
+
+Riesgos conocidos: si la persona está hablando justo cuando termina la carga, el aviso de Gabriela puede no sonar (Deepgram lo rechaza mientras la persona habla); igual tiene el documento y responde sobre él.
+
 ### docs: keep two main documents (architecture and audio tests) and remove superseded docs
 Fecha: 2026-10-09, 14:50.
 

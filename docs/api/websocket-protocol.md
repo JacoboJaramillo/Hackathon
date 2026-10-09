@@ -56,6 +56,7 @@ El audio viaja en frames binarios. El servidor no lo modifica en ningún sentido
 | Binario | Audio PCM de 16 kHz, máximo 64 KB por frame | Lo reenvía al agente de Deepgram y, aparte, a la transcripción diarizada (sección 4.3). Si la conexión a Deepgram aún no abre, lo guarda en un buffer de hasta 50 frames y descarta los siguientes |
 | Texto | `{"type":"KeepAlive"}` | Lo reescribe como `{"type":"KeepAlive"}` y lo reenvía. Sirve para mantener viva la sesión cuando el micrófono está en silencio |
 | Texto | `{"type":"AskText","text":"..."}` | Pregunta tocada en la interfaz (sugerencias del brief). `text` debe ser texto de 1 a 300 caracteres. El servidor la reescribe como `{"type":"InjectUserMessage","content":"..."}` y la reenvía al agente, que la trata como un turno normal de la persona con las mismas reglas. Máximo 20 por sesión; las siguientes se ignoran |
+| Texto | `{"type":"AttachDocument","doc":"<documentId>"}` | Documento subido con la conversación abierta (RF-002). El servidor busca el id en su almacén de documentos; si existe y es distinto del actual, envía al agente `UpdatePrompt` con el texto cercado como datos y, al recibir `PromptUpdated`, `InjectAgentMessage` para que Gabriela diga "Recibí tu documento...". El cliente nunca envía texto del documento. Un id desconocido se ignora. Máximo 3 por sesión |
 | Texto | Cualquier otra cosa, incluido JSON inválido o cualquier otro `type` | Cierra la sesión con `1008 invalid_message` |
 
 Esta lista blanca impide que el navegador envíe a Deepgram mensajes de control como `Settings`, `UpdatePrompt`, `InjectAgentMessage` o `FunctionCallResponse`.
@@ -177,7 +178,7 @@ Costo: la transcripción diarizada se cobra por segundo de audio enviado, durant
 | Código | Razón | Quién cierra | Causa | Qué debe hacer la interfaz |
 |---|---|---|---|---|
 | 1000 | `client_closed` | Navegador | El usuario terminó la conversación | Nada |
-| 1008 | `invalid_message` | Servidor | Texto distinto de `KeepAlive` o de un `AskText` válido | Es un error de la interfaz; no reintentar en bucle |
+| 1008 | `invalid_message` | Servidor | Texto distinto de `KeepAlive`, de un `AskText` válido o de un `AttachDocument` | Es un error de la interfaz; no reintentar en bucle |
 | 1009 | (lo pone la librería `ws`) | Servidor | Frame de más de 64 KB | Enviar frames más pequeños |
 | 1011 | `upstream_closed` o `upstream_error` | Servidor | Deepgram cerró la sesión o la conexión falló | Mostrar el problema y ofrecer reconectar |
 | 1011 | `client_error` | Servidor | Error en el socket del navegador | Reconectar |

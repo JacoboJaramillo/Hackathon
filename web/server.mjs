@@ -6,7 +6,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createLimiter, isAllowedOrigin, clientIp, ipKey } from './server/limits.mjs';
-import { buildSettings } from './server/agent-settings.mjs';
+import { buildSettings, documentUpdate, DOC_RECEIVED } from './server/agent-settings.mjs';
 import { buscarSedes, loadMunicipios } from './server/ips.mjs';
 import { parseDocument, createDocumentStore, MAX_BYTES } from './server/documents.mjs';
 import { generateBrief } from './server/brief.mjs';
@@ -31,6 +31,8 @@ const withDeadline = (promise, ms) => Promise.race([
 // Typed questions (tapped brief suggestions): short plain text only.
 const MAX_ASKS_PER_SESSION = 20;
 const validAsk = (t) => typeof t === 'string' && t.trim().length > 0 && t.length <= 300;
+// Documents uploaded during a conversation (RF-002); each one is a paid prompt update.
+const MAX_ATTACH_PER_SESSION = 3;
 const DEEPGRAM_URL = 'wss://agent.deepgram.com/v1/agent/converse';
 // Upstream events the browser needs; everything else stays on the server.
 const FORWARD_TYPES = new Set([
@@ -158,6 +160,12 @@ function runSession(client, { id, ip, limitKey, release, documentText }) {
     }
     let msg;
     try { msg = JSON.parse(data.toString()); } catch { return; }
+    // A document attached mid-conversation is announced only once the agent has it.
+    if (msg.type === 'PromptUpdated' && announceDoc) {
+      announceDoc = false;
+      upstream.send(JSON.stringify({ type: 'InjectAgentMessage', behavior: 'queue', message: DOC_RECEIVED }));
+      return;
+    }
     if (FORWARD_TYPES.has(msg.type)) return sendClient(msg);
     if (msg.type === 'FunctionCallRequest') return handleFunctions(msg);
     if (msg.type === 'Error') {
@@ -202,9 +210,12 @@ function runSession(client, { id, ip, limitKey, release, documentText }) {
   });
 
   let asks = 0;
+  let attaches = 0;
+  let currentDoc = documentText;
+  let announceDoc = false;
   client.on('message', (data, isBinary) => {
     if (!isBinary) {
-      // Only KeepAlive and AskText are accepted as text, and both are rebuilt
+      // Only KeepAlive, AskText and AttachDocument are accepted as text, all rebuilt
       // here: forwarding client JSON could inject settings or a new prompt.
       let msg;
       try { msg = JSON.parse(data.toString()); } catch { return close(1008, 'invalid_message'); }
@@ -214,6 +225,16 @@ function runSession(client, { id, ip, limitKey, release, documentText }) {
         // A tapped question becomes a normal user turn; the system prompt and
         // its rules still apply to it.
         data = JSON.stringify({ type: 'InjectUserMessage', content: msg.text.trim() });
+      } else if (msg?.type === 'AttachDocument' && typeof msg.doc === 'string') {
+        // Only a document this server parsed and still holds can reach the prompt;
+        // the client sends its id, never text.
+        const doc = documents.get(msg.doc);
+        if (!doc || doc.text === currentDoc || upstream.readyState !== WebSocket.OPEN) return;
+        if (++attaches > MAX_ATTACH_PER_SESSION) return;
+        currentDoc = doc.text;
+        announceDoc = true;
+        logEvent('document_attached', { id });
+        data = JSON.stringify({ type: 'UpdatePrompt', prompt: documentUpdate(doc.text) });
       } else return close(1008, 'invalid_message');
     }
     if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: isBinary });
