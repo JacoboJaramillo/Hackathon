@@ -43,6 +43,19 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: QA guide entry for step 3 production results (cubre también "test: record step 3 production results for document upload")
+Fecha: 2026-10-09, 11:30.
+
+Qué se hizo: se anotaron en `docs/TESTING.md` los resultados del paso 3 contra producción (revisión `agente-vocal-00005`): R-013 a R-015. Quedan Aprobado CP-023, CP-024, CP-026, CP-027, CP-067 y CP-070. El commit anterior de resultados salió sin su entrada; esta la cubre.
+
+Cómo probarlo: abrir `docs/TESTING.md`, sección 15, y repetir cualquiera de esos casos con los comandos de la sección 4.
+
+Resultado esperado: los mismos códigos y tiempos anotados (carga con brief en menos de 3 s).
+
+Qué no se puede probar todavía: CP-028, CP-029 y CP-071 desde la interfaz (paso 4). CP-068 (límite de 5 cargas por minuto) se observó, pero queda para que el QA lo ejecute completo.
+
+Riesgos conocidos: ninguno nuevo.
+
 ### feat: document upload with brief and document-grounded voice sessions
 Fecha: 2026-10-09, 11:20.
 
