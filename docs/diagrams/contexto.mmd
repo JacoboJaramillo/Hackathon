@@ -4,6 +4,7 @@ flowchart LR
   deepgram["Deepgram - Voice Agent API (STT nova-3, TTS aura-2-celeste-es) y STT en streaming con diarización"]
   deepseek["DeepSeek API - modelo deepseek-chat"]
   datosgov["datos.gov.co - dataset IPS s2ru-bqt6"]
+  whatsapp["Meta WhatsApp Cloud API - envío opcional de sedes (RF-024)"]
 
   usuario -- "HTTPS: página y GET /api/health" --> sistema
   usuario -- "HTTPS: POST /api/document" --> sistema
@@ -13,3 +14,4 @@ flowchart LR
   deepgram -- "HTTPS: chat completions con la clave de DeepSeek" --> deepseek
   sistema -- "HTTPS: brief del documento y sentimiento por intervención" --> deepseek
   sistema -- "HTTPS: consulta SoQL con X-App-Token" --> datosgov
+  sistema -- "HTTPS: plantilla sedes_salud_v1, solo si la persona acepta" --> whatsapp

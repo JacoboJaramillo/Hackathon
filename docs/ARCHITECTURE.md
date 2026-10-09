@@ -28,6 +28,7 @@ flowchart LR
   deepgram["Deepgram - Voice Agent API (STT nova-3, TTS aura-2-celeste-es) y STT en streaming con diarización"]
   deepseek["DeepSeek API - modelo deepseek-chat"]
   datosgov["datos.gov.co - dataset IPS s2ru-bqt6"]
+  whatsapp["Meta WhatsApp Cloud API - envío opcional de sedes (RF-024)"]
 
   usuario -- "HTTPS: página y GET /api/health" --> sistema
   usuario -- "HTTPS: POST /api/document" --> sistema
@@ -37,6 +38,7 @@ flowchart LR
   deepgram -- "HTTPS: chat completions con la clave de DeepSeek" --> deepseek
   sistema -- "HTTPS: brief del documento y sentimiento por intervención" --> deepseek
   sistema -- "HTTPS: consulta SoQL con X-App-Token" --> datosgov
+  sistema -- "HTTPS: plantilla sedes_salud_v1, solo si la persona acepta" --> whatsapp
 ```
 
 Fuente: `docs/diagrams/contexto.mmd`.
@@ -72,12 +74,14 @@ flowchart LR
     brief["server/brief.mjs - resumen y preguntas"]
     diar["server/diarize.mjs - agrupa palabras por hablante"]
     sent["server/sentiment.mjs - sentimiento y emoción por intervención"]
+    wap["server/whatsapp.mjs - enviar_whatsapp, límites y plantilla (opcional)"]
   end
 
   deepgram["Deepgram Voice Agent API"]
   dgstt["Deepgram STT v1/listen - segundo upstream con diarización"]
   deepseek["DeepSeek API"]
   datosgov["datos.gov.co SODA2"]
+  whatsapp["Meta WhatsApp Cloud API"]
 
   page --> stage
   page --> transcript
@@ -98,11 +102,13 @@ flowchart LR
   brief -- "HTTPS brief" --> deepseek
   srv --> diar
   srv --> sent
+  srv --> wap
   srv -- "WSS con Authorization Token" --> deepgram
   diar -- "WSS: mismo audio del micrófono" --> dgstt
   sent -- "HTTPS clasificación" --> deepseek
   deepgram -- "HTTPS" --> deepseek
   ips -- "HTTPS GET con X-App-Token" --> datosgov
+  wap -- "HTTPS POST con Bearer" --> whatsapp
 ```
 
 Fuente: `docs/diagrams/contenedores.mmd`.
@@ -120,6 +126,7 @@ Lectura de izquierda a derecha: `page.tsx` compone los paneles de la interfaz y 
 | Componentes de la interfaz | `web/src/app/components/` | `GabrielaStage` (orbe que reacciona al nivel de audio y botón de inicio), `TranscriptPanel` (intervenciones por hablante con hora y emoción), `SentimentPanel` (emoción actual por hablante y línea de tendencia), `DocumentUpload` (carga, resumen y preguntas tocables), `SedesPanel` (tarjetas de sedes y enlace a Google Maps que solo se abre al tocarlo) | Props de React | Construido |
 | Documento y brief | `web/server/documents.mjs`, `web/server/parse-worker.mjs`, `web/server/brief.mjs` | Tipo real por firma (PDF con unpdf, DOCX leyendo `word/document.xml` con fflate, TXT UTF-8). PDF y DOCX se extraen en un worker thread desechable (tope de memoria y plazo de 10 s) para que una bomba de descompresión no bloquee el bucle de eventos que comparten los relevos de voz. Texto hasta 20 000 caracteres en memoria 30 min (máximo 100 documentos). Brief de 3 a 5 preguntas con DeepSeek en 25 s como máximo. La sesión de voz recibe el texto con `/ws/agent?doc=<id>` | `POST /api/document`; `parseDocument`, `createDocumentStore`, `generateBrief` | Construido |
 | Transcripción diarizada | `web/server/diarize.mjs` | Segunda conexión a Deepgram STT (`nova-3`, `diarize=true`, `endpointing=300`, `utterance_end_ms=1000`) con el mismo audio del micrófono. Agrupa las palabras finales por hablante (se une al mismo hablante si el hueco es menor a 1 s) y emite intervenciones. Descarta frames si el socket acumula más de 1 MiB y envía `KeepAlive` cada 5 s | `createDiarizer({ apiKey, onTurn, log })` con `send(frame)` y `close()`; `groupWords` (pura) | Construido. Precisión con voces reales sin medir (sección 13) |
+| WhatsApp (opcional) | `web/server/whatsapp.mjs` | Herramienta `enviar_whatsapp` (RF-024). Valida `{telefono, sedes}` (celular colombiano, máximo 3 posiciones), arma el mensaje con la copia que `server.mjs` guarda de la última búsqueda exitosa (el modelo no escribe el texto) y envía la plantilla `sedes_salud_v1` a la Cloud API de Meta (8 s, sin reintento). Límites en memoria: 1 por IP y 1 por número (hash) cada 10 min, 3 por hora en total. Solo existe si `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` están definidos; `agent-settings.mjs` añade entonces `WHATSAPP_PROMPT` y la definición de la herramienta | `createWhatsApp(...).send`, `validateArgs`, `TOOL_DEFINITION` | Construido; plantilla pendiente de aprobación de Meta |
 | Sentimiento | `web/server/sentiment.mjs` | Una llamada a DeepSeek por intervención (`temperature` 0, JSON, plazo de 4 s). El texto va cercado entre `<intervencion>` y `</intervencion>` como datos y la salida se valida contra listas cerradas de sentimiento y emoción. Devuelve `null` ante cualquier fallo | `classifySentiment(text, { apiKey })` | Construido |
 
 Reglas de modularidad que se cumplen hoy: `server.mjs` solo usa las funciones exportadas de cada módulo; `ips.mjs` no conoce el WebSocket; `agent-settings.mjs` toma la definición de la herramienta de `ips.mjs` por su export `TOOL_DEFINITION` y no por duplicación. No hay base de datos, así que la regla "cada módulo es dueño de sus tablas" no aplica; los únicos estados compartidos de un módulo son las cachés en memoria de `ips.mjs` (lista de municipios y filas ya consultadas) y el almacén de documentos de `documents.mjs`, que vence a los 30 minutos.
@@ -225,6 +232,7 @@ flowchart LR
     dg["Deepgram - recibe audio (agente y STT diarizado) y la clave de DeepSeek"]
     ds["DeepSeek - recibe texto de la conversación, del documento y de cada intervención"]
     dt["datos.gov.co - recibe municipio y tipo de atención"]
+    wa["Meta WhatsApp Cloud API - recibe el número de destino y la lista de sedes"]
   end
 
   subgraph z4["Zona 4 - plano de control de GCP"]
@@ -245,6 +253,7 @@ flowchart LR
   docs -- "B2: texto del documento cercado como datos" --> ds
   proxy -- "B3: argumentos validados y literales escapados" --> tool
   tool --> dt
+  proxy -- "B3: teléfono y posiciones validados; el texto lo arma el servidor" --> wa
   sm -- "B4: inyección al desplegar" --> env
   iam --> sm
 ```
@@ -312,7 +321,7 @@ Lectura de izquierda a derecha: el desarrollador empuja a GitHub, donde la CI de
 | Identidad en ejecución | `agente-vocal-run`, solo `roles/secretmanager.secretAccessor` sobre `deepseek-api-key`, `deepgram-api-key` y `datosgov-app-token` (replicados en `us-east1`) |
 | Imagen | Multi-etapa `node:24-slim`, usuario `node` (no root), solo dependencias de producción, `CMD ["node", "server.mjs"]`, puerto 8080 |
 | Registro de imágenes | Artifact Registry, repositorio `cloud-run-source-deploy` en `us-east1` |
-| Variables de entorno | `DEEPGRAM_API_KEY` y `DEEPSEEK_API_KEY` obligatorias (sin ellas el proceso termina con código 1); `DATOSGOV_APP_TOKEN` opcional (sin él datos.gov.co aplica límites más bajos); `ALLOWED_ORIGINS` (en producción, vacía significa rechazar todo upgrade); opcionales `SESSION_MAX_MS`, `MAX_SESSIONS`, `MAX_SESSIONS_PER_IP`, `MAX_CONNECTS_PER_MIN`, `PORT` |
+| Variables de entorno | `DEEPGRAM_API_KEY` y `DEEPSEEK_API_KEY` obligatorias (sin ellas el proceso termina con código 1); `DATOSGOV_APP_TOKEN` opcional (sin él datos.gov.co aplica límites más bajos); `ALLOWED_ORIGINS` (en producción, vacía significa rechazar todo upgrade); opcionales `SESSION_MAX_MS`, `MAX_SESSIONS`, `MAX_SESSIONS_PER_IP`, `MAX_CONNECTS_PER_MIN`, `PORT`; opcionales de RF-024: `WHATSAPP_ACCESS_TOKEN` (secreto `whatsapp-access-token`), `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID` (solo gestión de plantillas), `WHATSAPP_API_VERSION` (`v25.0`) y `WHATSAPP_MAX_PER_HOUR` (3) |
 
 Los límites de admisión son por instancia. Con `max-instances` 2 el techo real es de 16 sesiones de voz simultáneas en todo el servicio, y de 4 por IP si sus conexiones caen en instancias distintas. La concurrencia de 40 por instancia deja holgura para las peticiones HTTP de páginas mientras hay 8 sesiones de voz abiertas.
 
@@ -374,6 +383,7 @@ El `id` de sesión es el identificador de correlación. Las métricas de peticio
 | Deepgram envía un mensaje `Error` sin cerrar | Mensaje `Error` | Registra el detalle como `upstream_error` y envía al navegador un `Error` saneado; la sesión sigue abierta | Mensaje genérico en pantalla |
 | DeepSeek lento o caído | Nada directo: lo llama Deepgram | Deepgram anuncia `AgentThinking` y, si DeepSeek falla, emite `Error`, que sigue el caso anterior. Nuestro servidor no impone un tope propio al LLM; el límite es la sesión de 10 min | Estado "pensando" más largo o mensaje genérico |
 | datos.gov.co responde 429, 5xx o error de red | Excepción en `getJson` | ante un 5xx `getJson` reintenta una vez; ante 429, otro estado de error o error de red la herramienta devuelve `{ "error": "servicio_no_disponible" }` al modelo y al navegador y el prompt obliga a decir que no lo sabe. Las consultas exitosas quedan en una caché en memoria (hasta 500) y la lista de municipios se precarga al arrancar el proceso, para que la primera búsqueda por voz no pague esa carga. Si fallaba la carga de municipios, la caché se vacía y la siguiente llamada reintenta | El agente dice que no pudo consultar; no inventa sedes |
+| WhatsApp (Meta) rechaza, no responde o la plantilla no está aprobada | Respuesta no 200 o sin `messages[0].id`, timeout de 8 s o error de red | La herramienta devuelve `{ "error": "no_disponible" }`, se registra `whatsapp_failed` con el hash del número y no se reintenta; el prompt manda explicarlo en una frase | Gabriela dice que no pudo enviar el mensaje; la conversación sigue |
 | datos.gov.co no responde | Timeout de 8 s por petición (`AbortSignal.timeout`) | Igual que el caso anterior | Igual, tras la espera |
 | El STT diarizado no abre, se cae o se atrasa | `error` o `close` en su socket; `bufferedAmount` mayor a 1 MiB | `diarize.mjs` se marca como muerto, registra `diarize_error` y descarta frames; no toca la conexión del agente ni la sesión | Dejan de llegar `Transcript` y `Sentiment`; la interfaz usa el `ConversationText` del usuario como respaldo |
 | DeepSeek falla al clasificar sentimiento | Tiempo agotado (4 s), error HTTP o JSON fuera de las listas | `classifySentiment` devuelve `null`, registra `sentiment_failed` y no se envía `Sentiment`. Máximo 2 clasificaciones en curso por sesión; las intervenciones de menos de 2 palabras no se clasifican | Intervención sin emoción |
@@ -391,6 +401,7 @@ El `id` de sesión es el identificador de correlación. Las métricas de peticio
 - `min-instances` 0 fuera de la ventana del jurado: sin tráfico no hay costo de cómputo.
 - 1 vCPU y 1 GiB: el proceso solo releva bytes y hace consultas HTTP; no procesa audio.
 - Alerta de presupuesto: pendiente. La cuenta de facturación es compartida y el desarrollador no tiene permiso para crear presupuestos; la debe crear el administrador de facturación, filtrada al proyecto `agente-vocal-hackaton`.
+- WhatsApp (RF-024) cobra por mensaje de plantilla: máximo 1 por IP y 1 por número cada 10 minutos y 3 por hora en total, contados al intentar. Los contadores son por instancia, así que con `max-instances` 2 el tope global real puede ser el doble.
 - Proyecto dedicado al evento: el desmontaje es `gcloud projects delete` y la revocación de las tres claves (`docs/PLAN.md` sección 7).
 
 ## 12. Pruebas que respaldan la arquitectura

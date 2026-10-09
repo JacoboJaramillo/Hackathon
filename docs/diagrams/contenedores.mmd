@@ -20,12 +20,14 @@ flowchart LR
     brief["server/brief.mjs - resumen y preguntas"]
     diar["server/diarize.mjs - agrupa palabras por hablante"]
     sent["server/sentiment.mjs - sentimiento y emoción por intervención"]
+    wap["server/whatsapp.mjs - enviar_whatsapp, límites y plantilla (opcional)"]
   end
 
   deepgram["Deepgram Voice Agent API"]
   dgstt["Deepgram STT v1/listen - segundo upstream con diarización"]
   deepseek["DeepSeek API"]
   datosgov["datos.gov.co SODA2"]
+  whatsapp["Meta WhatsApp Cloud API"]
 
   page --> stage
   page --> transcript
@@ -46,8 +48,10 @@ flowchart LR
   brief -- "HTTPS brief" --> deepseek
   srv --> diar
   srv --> sent
+  srv --> wap
   srv -- "WSS con Authorization Token" --> deepgram
   diar -- "WSS: mismo audio del micrófono" --> dgstt
   sent -- "HTTPS clasificación" --> deepseek
   deepgram -- "HTTPS" --> deepseek
   ips -- "HTTPS GET con X-App-Token" --> datosgov
+  wap -- "HTTPS POST con Bearer" --> whatsapp

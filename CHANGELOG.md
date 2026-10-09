@@ -5,6 +5,7 @@ Cambios agrupados por paso del plan, el más reciente primero. Las fechas y hora
 ## Sin publicar
 
 - Paso 5, en construcción: transcripción diarizada con un segundo stream de STT de Deepgram, sentimiento por intervención con DeepSeek y los mensajes `Transcript` y `Sentiment` del WebSocket (RF-007, RF-008). Aún no hay commit.
+- RF-024, envío opcional de sedes por WhatsApp: herramienta `enviar_whatsapp`, módulo `web/server/whatsapp.mjs` y plantilla `sedes_salud_v1` de la Cloud API (pendiente de aprobación de Meta), con límites por IP, por número y global, y activación solo si hay credenciales. Variables nuevas `WHATSAPP_*`. Aún no hay commit.
 - Documentación faltante de CLAUDE.md sección 5: `README.md`, `CHANGELOG.md`, `docs/SECURITY.md`, `docs/TRACEABILITY.md`, `docs/INTEGRATIONS.md`, `docs/DATA-MODEL.md`.
 
 ## Pruebas, capacidad y guion de QA

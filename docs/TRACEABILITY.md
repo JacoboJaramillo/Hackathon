@@ -9,7 +9,7 @@ Estados:
 - Pendiente: ningún caso Aprobado en `docs/TESTING.md`. Puede haber pruebas automáticas de la lógica (se citan en Evidencia) pero el caso de aceptación no se ha ejecutado.
 - En construcción: el módulo no está terminado (paso 5).
 
-Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; SET = `web/server/agent-settings.mjs`; IPS = `web/server/ips.mjs`; DOC = `web/server/documents.mjs` y `parse-worker.mjs`; BRF = `web/server/brief.mjs`; UI = `web/src/app/` (componentes `DocumentUpload`, `VoicePanel`, `SedesPanel`); NXT = `web/next.config.mjs`.
+Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; SET = `web/server/agent-settings.mjs`; IPS = `web/server/ips.mjs`; DOC = `web/server/documents.mjs` y `parse-worker.mjs`; BRF = `web/server/brief.mjs`; UI = `web/src/app/` (componentes `DocumentUpload`, `VoicePanel`, `SedesPanel`); NXT = `web/next.config.mjs`; WAP = `web/server/whatsapp.mjs`.
 
 ## 1. Requerimientos funcionales
 
@@ -38,6 +38,7 @@ Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; 
 | RF-021 Documento que no es de salud | SET (`buildSettings`), IPS | `GET /ws/agent?doc=<id>` | DocumentRecord | CP-013 | Pendiente | Regla en el prompt; sin ejecución |
 | RF-022 Sin diagnóstico ni comparaciones | SET (`BASE_PROMPT`) | `GET /ws/agent` | SessionState | CP-017 | Pendiente | Regla en el prompt; sin ejecución |
 | RF-023 Estilo de voz | SET (`BASE_PROMPT`, saludo) | `GET /ws/agent` | SessionState | CP-018 | Pendiente | Regla en el prompt; sin ejecución |
+| RF-024 Envío opcional de sedes por WhatsApp | WAP (`validateArgs`, `buildParams`, `createWhatsApp`), SRV (`handleFunctions`, herramienta `enviar_whatsapp`), SET (`WHATSAPP_PROMPT`) | `GET /ws/agent` (herramienta del lado del servidor, sin mensaje nuevo al navegador) | SessionState (última búsqueda), WhatsAppWindows | CP-074 a CP-085 | Pendiente | Pruebas unitarias en `web/server/whatsapp.test.mjs`; sin resultados reportados aún. Plantilla `sedes_salud_v1` pendiente de aprobación de Meta |
 
 ## 2. Requerimientos no funcionales
 
@@ -58,9 +59,9 @@ Abreviaturas de módulo: SRV = `web/server.mjs`; LIM = `web/server/limits.mjs`; 
 
 Revisión hecha contra `docs/REQUIREMENTS.md` y `docs/TESTING.md`.
 
-Requerimientos sin casos de prueba: ninguno. Los 33 (RF-001 a RF-023 y RNF-001 a RNF-010) tienen al menos un caso en `docs/TESTING.md`.
+Requerimientos sin casos de prueba: ninguno. Los 34 (RF-001 a RF-024 y RNF-001 a RNF-010) tienen al menos un caso en `docs/TESTING.md`.
 
-Casos de prueba sin requerimiento: ninguno. Los 73 casos (CP-001 a CP-073) apuntan a un requerimiento existente en la columna "Req." de `docs/TESTING.md`.
+Casos de prueba sin requerimiento: ninguno. Los 85 casos (CP-001 a CP-085) apuntan a un requerimiento existente en la columna "Req." de `docs/TESTING.md`.
 
 Discrepancias que conviene corregir en los documentos fuente:
 
@@ -69,4 +70,4 @@ Discrepancias que conviene corregir en los documentos fuente:
 - Pruebas automáticas sin ID de requerimiento en el nombre: las de `web/server/ips.test.mjs` (mapeo implícito a RF-009 a RF-013). `CLAUDE.md` 5.3 pide el ID en el nombre; queda como mejora.
 - Las pruebas k6 y el guion `docs/QA-CONVERSACIONES.md` se asocian a requerimientos por los casos CP-058 a CP-062, CP-072, CP-073 y por la sección correspondiente del guion; el guion no lleva IDs.
 
-Resumen de estados: 2 Aprobados (RF-003, RNF-007); 9 Parciales (RF-001, RF-002, RF-004, RF-006, RF-009, RNF-004, RNF-005, RNF-006, RNF-009); 2 En construcción (RF-007, RF-008); 20 Pendientes. Un requerimiento Pendiente no está probado, aunque el código exista.
+Resumen de estados: 2 Aprobados (RF-003, RNF-007); 9 Parciales (RF-001, RF-002, RF-004, RF-006, RF-009, RNF-004, RNF-005, RNF-006, RNF-009); 2 En construcción (RF-007, RF-008); 21 Pendientes. Un requerimiento Pendiente no está probado, aunque el código exista.

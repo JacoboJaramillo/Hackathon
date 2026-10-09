@@ -7,6 +7,8 @@
 #   printf '%s' "<value>" | gcloud secrets create <name> --replication-policy=user-managed \
 #     --locations=us-east1 --data-file=- --project agente-vocal-hackaton
 #   for each of: deepseek-api-key, deepgram-api-key, datosgov-app-token
+# Optional (RF-024, WhatsApp): secret whatsapp-access-token, plus
+# WHATSAPP_PHONE_NUMBER_ID exported in the shell that runs this script.
 #
 # Usage, from the repository root: bash infra/deploy.sh
 set -euo pipefail
@@ -17,6 +19,12 @@ SERVICE=agente-vocal
 RUNTIME_SA="agente-vocal-run@${PROJECT}.iam.gserviceaccount.com"
 BUILD_SA="agente-vocal-build@${PROJECT}.iam.gserviceaccount.com"
 SECRETS=(deepseek-api-key deepgram-api-key datosgov-app-token)
+WHATSAPP=false
+if gcloud secrets describe whatsapp-access-token --project="$PROJECT" >/dev/null 2>&1; then
+  : "${WHATSAPP_PHONE_NUMBER_ID:?export WHATSAPP_PHONE_NUMBER_ID to deploy with WhatsApp}"
+  WHATSAPP=true
+  SECRETS+=(whatsapp-access-token)
+fi
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
 URL="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
 # Every command names the project explicitly; the local gcloud default may
@@ -33,7 +41,7 @@ for sa in agente-vocal-run agente-vocal-build; do
     gcloud iam service-accounts create "$sa" --display-name="$sa" $G
 done
 
-echo "3. Runtime account: read access to its three secrets only"
+echo "3. Runtime account: read access to its own secrets only"
 for s in "${SECRETS[@]}"; do
   gcloud secrets add-iam-policy-binding "$s" --member="serviceAccount:$RUNTIME_SA" \
     --role=roles/secretmanager.secretAccessor $G >/dev/null
@@ -55,13 +63,18 @@ pin() { gcloud secrets versions list "$1" --filter=state=enabled --sort-by=~crea
 SECRET_FLAGS="DEEPGRAM_API_KEY=deepgram-api-key:$(pin deepgram-api-key)"
 SECRET_FLAGS+=",DEEPSEEK_API_KEY=deepseek-api-key:$(pin deepseek-api-key)"
 SECRET_FLAGS+=",DATOSGOV_APP_TOKEN=datosgov-app-token:$(pin datosgov-app-token)"
+ENV_VARS="ALLOWED_ORIGINS=${URL}"
+if $WHATSAPP; then
+  SECRET_FLAGS+=",WHATSAPP_ACCESS_TOKEN=whatsapp-access-token:$(pin whatsapp-access-token)"
+  ENV_VARS+=",WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID},WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v25.0}"
+fi
 
 echo "7. Build and deploy"
 gcloud run deploy "$SERVICE" --source web --region "$REGION" $G \
   --build-service-account="projects/${PROJECT}/serviceAccounts/${BUILD_SA}" \
   --service-account="$RUNTIME_SA" \
   --set-secrets="$SECRET_FLAGS" \
-  --set-env-vars="ALLOWED_ORIGINS=${URL}" \
+  --set-env-vars="$ENV_VARS" \
   --allow-unauthenticated \
   --session-affinity --timeout=3600 \
   --min-instances="${MIN_INSTANCES:-0}" --max-instances=2 \

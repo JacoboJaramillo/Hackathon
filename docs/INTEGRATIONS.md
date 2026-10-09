@@ -9,12 +9,14 @@ flowchart LR
     srv["server.mjs - proxy de voz y POST /api/document"]
     ips["ips.mjs - buscar_sedes"]
     brief["brief.mjs - brief del documento"]
+    wap["whatsapp.mjs - enviar_whatsapp (opcional)"]
     diar["Diarizacion y sentimiento - en construccion"]
   end
   dg["Deepgram Voice Agent API - STT, TTS y orquestacion"]
   dgstt["Deepgram STT en streaming - diarizacion (en construccion)"]
   ds["DeepSeek API - deepseek-chat"]
   dt["datos.gov.co SODA2 - s2ru-bqt6"]
+  wa["Meta WhatsApp Cloud API - plantilla sedes_salud_v1"]
   sm["Google Secret Manager"]
 
   nav -- "WSS /ws/agent: audio y eventos" --> srv
@@ -24,6 +26,8 @@ flowchart LR
   dg -- "FunctionCallRequest" --> srv
   srv --> ips
   ips -- "HTTPS GET con X-App-Token" --> dt
+  srv --> wap
+  wap -- "HTTPS POST /messages con Bearer" --> wa
   srv --> brief
   brief -- "HTTPS POST chat completions" --> ds
   srv -.-> diar
@@ -42,6 +46,7 @@ Resumen:
 | DeepSeek directo (brief) | Servidor a DeepSeek | HTTPS | `Authorization: Bearer <clave>` | 25 s | Ninguno |
 | DeepSeek directo (sentimiento) | Servidor a DeepSeek | HTTPS | Igual que el brief | Por definir | En construcción |
 | datos.gov.co | Servidor a datos.gov.co | HTTPS | `X-App-Token` opcional | 8 s por petición, 12 s por llamada | Ninguno |
+| WhatsApp Cloud API (opcional) | Servidor a Meta | HTTPS | `Authorization: Bearer <WHATSAPP_ACCESS_TOKEN>` | 8 s | Ninguno |
 | Secret Manager | Cloud Run a Secret Manager | API de GCP, al desplegar | Identidad `agente-vocal-run` | No aplica | No aplica |
 | Cloud Run | Plataforma | HTTPS y WSS | Acceso público (ADR 0004) | Petición 3600 s | No aplica |
 
@@ -114,14 +119,29 @@ DeepSeek se usa por dos caminos distintos, con la misma clave (`DEEPSEEK_API_KEY
 - Fallo: si la API falla se usa la copia local (siguiente punto). Solo si también falla la copia, la herramienta devuelve `{"error":"servicio_no_disponible"}` y el prompt obliga al agente a decir que no pudo consultar, sin inventar sedes; se registra `buscar_sedes_failed` en JSON.
 - Plan si cae: copia local de respaldo. `web/server/data/ips-snapshot.json.gz` (41 427 filas, unos 0,8 MB, solo las columnas de la lista blanca) se genera con `node --env-file-if-exists=../.env scripts/snapshot-ips.mjs` desde `web/`. La API sigue siendo la fuente principal: cada búsqueda tiene un presupuesto de 6,5 s para la API (reintento de 5xx incluido); si falla (5xx, vencimiento o red), `ips.mjs` aplica los mismos filtros sobre la copia en memoria (cargada una vez) y devuelve la misma estructura, con el mismo respaldo municipio y luego departamento. `loadMunicipios` cae también a la lista de la copia. Cada respaldo deja una línea JSON `{"severity":"WARNING","event":"ips_fallback","reason":...}` sin texto del usuario. Los resultados del respaldo no entran en la caché de consultas, así que la siguiente búsqueda vuelve a intentar la API.
 
-## 5. Google Secret Manager
+## 5. WhatsApp Cloud API de Meta (opcional, RF-024)
 
-- Propósito: guardar `deepseek-api-key`, `deepgram-api-key` y `datosgov-app-token`, replicados en `us-east1`.
+- Propósito: enviar a la persona, a su celular y solo si lo acepta, las sedes de la última búsqueda. Código: `web/server/whatsapp.mjs` (`validateArgs`, `buildParams`, `createWhatsApp`), invocado desde `handleFunctions` en `web/server.mjs` cuando el modelo llama a la herramienta `enviar_whatsapp {telefono, sedes:[int]}`. La definición de la herramienta y la sección `WHATSAPP_PROMPT` solo existen si `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` están definidos.
+- Dirección y protocolo: POST HTTPS a `https://graph.facebook.com/{WHATSAPP_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages` (versión `v25.0` por defecto).
+- Autenticación: `Authorization: Bearer <WHATSAPP_ACCESS_TOKEN>`, token de usuario del sistema de larga duración guardado en Secret Manager (`whatsapp-access-token`). `WHATSAPP_BUSINESS_ACCOUNT_ID` solo sirve para administrar plantillas; el servidor no lo usa.
+- Plantilla: `sedes_salud_v1`, categoría UTILITY, idioma `es`, enviada a Meta el 2026-10-09 y pendiente de aprobación al escribir esto. Cuerpo: "Hola. Estas son las sedes de salud que pediste en {{1}}: {{2}} Datos del Registro Especial de Prestadores de Salud (datos.gov.co). Confirma horarios por teléfono antes de ir. Si es una emergencia, llama al 123." Pie: "Gabriela - ¿Dónde me atienden?". Remitente: el número de Solutions Tech Web en la Cloud API, con nivel de mensajería de 250 destinatarios por día.
+- Datos enviados: `{{1}}` es el lugar (municipio y departamento; solo departamento si la búsqueda tuvo alcance de departamento) y `{{2}}` la lista "1) nombre, dirección, tel X." con espacios colapsados y máximo 700 caracteres. El servidor la arma con su copia de la última búsqueda exitosa de `buscar_sedes`; el modelo solo aporta el teléfono y las posiciones (máximo 3), nunca el texto. El número viaja a Meta en el campo `to`.
+- Privacidad: el número se dicta por voz, así que pasa por Deepgram (STT) y por DeepSeek (como argumento de la herramienta); el producto lo aceptó y el consentimiento es el sí explícito hablado tras la repetición en grupos 3-3-4. El número no se guarda; en el servidor solo vive su hash SHA-256 en la ventana de 10 minutos. No se reenvía nada al navegador por esta herramienta (sin mensaje nuevo en el WebSocket): Gabriela confirma por voz y la transcripción lo muestra.
+- Límites (se cuentan al intentar, no al lograr): 1 mensaje por IP de cliente (IPv6 por bloque /64, con hash) cada 10 minutos, 1 por número destino (hash SHA-256) cada 10 minutos y 3 por hora en total (`WHATSAPP_MAX_PER_HOUR`). Están en memoria por instancia: con `max-instances` 2 el tope global real puede ser el doble (comentario `ponytail:` en el código); si debe ser exacto, usar un almacén compartido.
+- Timeout: 8 s. Reintentos: ninguno.
+- Errores devueltos al modelo: `parametros_invalidos`, `telefono_invalido`, `sin_busqueda`, `sedes_invalidas`, `limite_alcanzado`, `limite_global` y `no_disponible` (cualquier fallo de Meta o de red). Gabriela lo explica en una frase y no reintenta.
+- Registros: `tool_call`, `whatsapp_sent {phone: hash}` y `whatsapp_failed {phone: hash, status, code | reason}`. Nunca el número ni el token.
+- Plan si cae o se rechaza: la conversación de voz sigue igual; solo falla el envío con `no_disponible`. Si Meta rechaza la plantilla o la recategoriza a MARKETING, todos los envíos fallan hasta aprobar otra. Sin las variables, la función queda desactivada.
+- Riesgos conocidos: dígitos dictados mal reconocidos (mitigado con la repetición 3-3-4 y la confirmación); plantilla aún pendiente; el token del usuario del sistema es de larga duración y debe rotarse al terminar el evento; el nombre visible del número aún no está aprobado, por lo que el destinatario puede ver solo el número.
+
+## 6. Google Secret Manager
+
+- Propósito: guardar `deepseek-api-key`, `deepgram-api-key` y `datosgov-app-token`, replicados en `us-east1`, y `whatsapp-access-token` si se activa RF-024 (variable `WHATSAPP_ACCESS_TOKEN`).
 - Dirección y protocolo: no hay llamadas en tiempo de ejecución. Al desplegar, Cloud Run resuelve cada secreto y lo inyecta como variable de entorno (`DEEPSEEK_API_KEY`, `DEEPGRAM_API_KEY`, `DATOSGOV_APP_TOKEN`). `infra/deploy.sh` fija la versión habilitada más reciente de cada secreto (`--set-secrets=NOMBRE=secreto:version`) para que una revisión sea reproducible.
 - Autenticación: la cuenta de servicio `agente-vocal-run` tiene solo `roles/secretmanager.secretAccessor` sobre esos tres secretos.
 - Fallo y plan: si un secreto no existe o no es accesible, el despliegue de la revisión falla y la revisión anterior sigue sirviendo. Rotar una clave exige crear una versión nueva y volver a ejecutar `bash infra/deploy.sh`; el proceso no relee secretos en caliente. Si faltan `DEEPGRAM_API_KEY` o `DEEPSEEK_API_KEY` el proceso termina con código 1.
 
-## 6. Cloud Run
+## 7. Cloud Run
 
 - Propósito: plataforma de ejecución del contenedor único (ADR 0003). Servicio `agente-vocal` en el proyecto `agente-vocal-hackaton`, región `us-east1`.
 - Protocolo: HTTPS y WSS terminados en el front end de Google; el servidor recibe HTTP en el puerto 8080 y toma la IP real de la última entrada de `X-Forwarded-For`.

@@ -31,6 +31,7 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 | RF-021 | Documento que no es de salud | Alta | Un documento no médico se resume y se responde con rigor; la herramienta de sedes no se invoca salvo que la pregunta sea de atención en salud | ADR 0001 | CP-013 |
 | RF-022 | Sin diagnóstico ni comparaciones | Alta | El agente nunca diagnostica, recomienda tratamientos o medicamentos, ni dice que una sede es mejor que otra. En 4 de 4 preguntas de prueba | ADR 0001 | CP-017 |
 | RF-023 | Estilo de voz | Media | Cada turno del agente tiene máximo dos frases y una pregunta, sin listas ni formato. Se verifica en 10 turnos | ADR 0001 | CP-018 |
+| RF-024 | Envío opcional de sedes por WhatsApp | Media | Tras mencionar sedes por primera vez, el agente ofrece una sola vez enviarlas por WhatsApp y no insiste. Solo si la persona acepta: pide un celular colombiano (10 dígitos, empieza por 3), lo repite en grupos 3-3-4 y pide confirmación, confirma cuáles sedes (máximo 3, por posición en la última búsqueda) y llama a `enviar_whatsapp` solo tras un sí explícito. El servidor arma el mensaje con su copia de la última búsqueda (el modelo no escribe el texto) y lo envía con la plantilla `sedes_salud_v1`. Máximo 1 mensaje por IP y 1 por número cada 10 minutos y 3 por hora en total; superado un límite o ante un fallo, el agente lo explica en una frase y no reintenta. Sin `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` la herramienta y la sección del prompt no existen | ADR 0001 | CP-074 a CP-085 |
 
 ## 2. Requerimientos no funcionales
 
@@ -49,8 +50,8 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 
 ## 3. Verificación de cobertura
 
-- Requerimientos: 23 funcionales (RF-001 a RF-023) y 10 no funcionales (RNF-001 a RNF-010), 33 en total.
-- Casos de prueba en `docs/TESTING.md`: 73 (CP-001 a CP-073).
+- Requerimientos: 24 funcionales (RF-001 a RF-024) y 10 no funcionales (RNF-001 a RNF-010), 34 en total.
+- Casos de prueba en `docs/TESTING.md`: 85 (CP-001 a CP-085).
 - Todo requerimiento tiene al menos un caso (columna "Casos") y todo caso apunta a un requerimiento existente. La matriz se revisa antes de la entrega.
 
 ## 4. Supuestos y pendientes
@@ -58,3 +59,4 @@ Prioridad: Alta (sin esto la demo falla), Media (puntúa pero la demo sobrevive)
 - Formatos de documento de hoy: PDF, DOCX y TXT. CSV, XLSX y MD del plan original quedan fuera hasta recibir R01 a R07.
 - Límite de tamaño de 20 MB tomado de `docs/PLAN.md`; confirmar contra el valor implementado.
 - Limitaciones de datos aceptadas (ADR 0001): sin especialidades, EPS, cupos, horarios ni disponibilidad en tiempo real.
+- RF-024 depende de que Meta apruebe la plantilla `sedes_salud_v1` (enviada el 2026-10-09, pendiente de aprobación). Sin aprobación, o si Meta la recategoriza a MARKETING, los envíos fallan con `no_disponible`.

@@ -14,6 +14,7 @@ erDiagram
   UPLOAD_RESPONSE ||--|| DOCUMENT_RECORD : "documentId"
   UPLOAD_RESPONSE ||--o| BRIEF : "brief"
   MUNICIPIO_CACHE ||--o{ SEDE_RESULT : "resuelve el municipio"
+  SEDE_RESULT ||--o{ WHATSAPP_WINDOW : "la ultima busqueda alimenta enviar_whatsapp"
 
   DOCUMENT_RECORD {
     string id PK "UUID v4, clave del mapa"
@@ -41,6 +42,11 @@ erDiagram
     string necesidad "enum de 15 categorias"
     number total_sedes
     object[] sedes "hasta 20"
+  }
+  WHATSAPP_WINDOW {
+    string ipKey PK "IP o bloque /64 con hash, ventana de 10 min"
+    string phoneHash PK "SHA-256 del numero destino, ventana de 10 min"
+    number[] sent "marcas de tiempo de la ultima hora, tope global"
   }
   MUNICIPIO_CACHE {
     string municipio
@@ -126,7 +132,20 @@ La transcripción y los resultados de la herramienta no se acumulan en el servid
 
 El agregado interno `total` por sede se elimina antes de responder. La caché de municipios (`municipiosPromise`) guarda solo pares `{ municipio, departamento }` del registro y se llena una vez por proceso.
 
-### 2.5 DTOs de la carga de documento (`POST /api/document`, `docs/api/openapi.yaml`)
+### 2.5 Ventanas de envío por WhatsApp (`web/server/whatsapp.mjs`, `createWhatsApp`, RF-024)
+
+Estado en memoria de la instancia, creado solo si `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` están definidos.
+
+| Elemento | Descripción |
+|---|---|
+| Ventana por IP | Mapa clave de cliente (IPv6 por bloque /64, con hash) a marca de tiempo del último intento; vence a los 10 minutos |
+| Ventana por número | Mapa SHA-256 del teléfono destino (12 caracteres hexadecimales) a marca de tiempo; vence a los 10 minutos. El número en claro no se guarda |
+| Envíos de la última hora | Lista de marcas de tiempo; con `WHATSAPP_MAX_PER_HOUR` (3 por defecto) como tope global |
+| Última búsqueda (`lastSedes`) | Copia, en el cierre de `runSession`, del último resultado exitoso de `buscar_sedes`; es la única fuente del mensaje y se descarta al cerrar la sesión |
+
+Todo se cuenta al intentar, no al lograr. Los contadores son por instancia.
+
+### 2.6 DTOs de la carga de documento (`POST /api/document`, `docs/api/openapi.yaml`)
 
 | DTO | Campos |
 |---|---|
@@ -145,6 +164,7 @@ El agregado interno `total` por sede se elimina antes de responder. La caché de
 | Transcripción y tarjetas de sedes | Pantalla del navegador | La vida de la pestaña | No se registran en el servidor |
 | Contadores del limitador | Memoria | Un minuto de intentos; los cupos hasta liberarse | Poda periódica y `release()` |
 | Caché de municipios | Memoria | La vida del proceso | Reinicio |
+| Ventanas de envío por WhatsApp | Memoria | 10 minutos por IP y por número (solo hash); 1 hora para el tope global | Poda en cada intento y reinicio de la instancia |
 | Logs | Cloud Logging (stdout JSON) | Retención por defecto del proyecto GCP | Borrado del proyecto al terminar el evento |
 
 No persiste nada entre reinicios, y nada se comparte entre instancias: con `max-instances` 2 y afinidad de sesión de mejor esfuerzo, un documento puede no encontrarse si la voz llega a otra instancia; la persona debe volver a subirlo (`docs/ARCHITECTURE.md` sección 13).
@@ -155,6 +175,7 @@ No persiste nada entre reinicios, y nada se comparte entre instancias: con `max-
 - Texto del documento: puede contener datos personales de quien lo sube. Se trata como dato no confiable (cercado y con `fenceSafe`), vive 30 minutos en memoria y no se escribe en logs: `document_uploaded` registra solo tipo, número de caracteres, `truncado`, si hubo brief y duración.
 - Transcripciones y audio: no se registran. Los logs de herramienta guardan el nombre, el código de error y el total de sedes, no los argumentos (municipio, necesidad).
 - IP del cliente: se registra solo como SHA-256 truncado a 12 caracteres. La IP completa se usa en memoria para los contadores y no se escribe.
+- Teléfono para WhatsApp (RF-024): se dicta por voz, así que pasa por Deepgram y DeepSeek (argumento de la herramienta) y llega a Meta como destino del mensaje. En el servidor no se guarda ni se registra: solo vive su SHA-256 truncado en la ventana de 10 minutos. El consentimiento es el sí explícito hablado tras la repetición en grupos 3-3-4.
 - Claves: solo en variables de entorno del proceso; nunca en el navegador, la imagen ni los logs.
 - Excepción conocida: el `documentId` va en la URL de `/ws/agent?doc=<id>` y por eso puede quedar en los registros de peticiones de Cloud Run (`docs/SECURITY.md`, deuda de seguridad).
-- Terceros: Deepgram recibe el audio y el texto del documento y de la conversación; DeepSeek recibe el texto de la conversación y del documento. datos.gov.co solo recibe nombres oficiales de municipio y departamento y el tipo de atención.
+- Terceros: Deepgram recibe el audio y el texto del documento y de la conversación; DeepSeek recibe el texto de la conversación y del documento. datos.gov.co solo recibe nombres oficiales de municipio y departamento y el tipo de atención. Meta (WhatsApp) recibe el número de destino y la lista de sedes, solo si la persona lo pidió.

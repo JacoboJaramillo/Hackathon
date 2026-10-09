@@ -5,17 +5,18 @@ import { createServer } from 'node:http';
 import { randomUUID, createHash } from 'node:crypto';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createLimiter, isAllowedOrigin, clientIp } from './server/limits.mjs';
+import { createLimiter, isAllowedOrigin, clientIp, ipKey } from './server/limits.mjs';
 import { buildSettings } from './server/agent-settings.mjs';
 import { buscarSedes, loadMunicipios } from './server/ips.mjs';
 import { parseDocument, createDocumentStore, MAX_BYTES } from './server/documents.mjs';
 import { generateBrief } from './server/brief.mjs';
 import { createDiarizer } from './server/diarize.mjs';
 import { classifySentiment } from './server/sentiment.mjs';
+import { createWhatsApp, validateArgs as validateWhatsApp } from './server/whatsapp.mjs';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT) || 3000;
-const { DEEPGRAM_API_KEY, DEEPSEEK_API_KEY, DATOSGOV_APP_TOKEN } = process.env;
+const { DEEPGRAM_API_KEY, DEEPSEEK_API_KEY, DATOSGOV_APP_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID } = process.env;
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || (dev ? `http://localhost:${port}` : ''))
   .split(',').map((s) => s.trim()).filter(Boolean);
 const SESSION_MAX_MS = Number(process.env.SESSION_MAX_MS) || 10 * 60_000;
@@ -52,6 +53,16 @@ const uploads = createLimiter({ perIp: 1, global: 4, ratePerMin: 5 });
 const documents = createDocumentStore();
 const hashIp = (ip) => createHash('sha256').update(ip).digest('hex').slice(0, 12);
 const logEvent = (event, fields) => console.log(JSON.stringify({ severity: 'INFO', event, ...fields }));
+// RF-024: optional; without both variables the agent never offers WhatsApp.
+const whatsapp = WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID
+  ? createWhatsApp({
+    token: WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: WHATSAPP_PHONE_NUMBER_ID,
+    version: process.env.WHATSAPP_API_VERSION || undefined,
+    perHour: Number(process.env.WHATSAPP_MAX_PER_HOUR) || 3,
+    log: logEvent,
+  })
+  : null;
 
 const app = next({ dev, port });
 const handle = app.getRequestHandler();
@@ -88,11 +99,11 @@ server.on('upgrade', (req, socket, head) => {
   const slot = limiter.admit(ip);
   if (!slot.ok) return reject(socket, slot.status, slot.reason, { id, ip: hashIp(ip) });
   wss.handleUpgrade(req, socket, head, (client) => runSession(client, {
-    id, ip: hashIp(ip), release: slot.release, documentText: doc?.text || '',
+    id, ip: hashIp(ip), limitKey: hashIp(ipKey(ip)), release: slot.release, documentText: doc?.text || '',
   }));
 });
 
-function runSession(client, { id, ip, release, documentText }) {
+function runSession(client, { id, ip, limitKey, release, documentText }) {
   logEvent('session_start', { id, ip, document: Boolean(documentText) });
   const started = Date.now();
   const upstream = new WebSocket(DEEPGRAM_URL, {
@@ -101,6 +112,9 @@ function runSession(client, { id, ip, release, documentText }) {
   });
   const pending = [];
   let closed = false;
+  // Last successful registry result; WhatsApp can only send sites from it.
+  let lastSedes = null;
+  let offered = false;
 
   const close = (code, reason) => {
     if (closed) return;
@@ -133,7 +147,7 @@ function runSession(client, { id, ip, release, documentText }) {
   });
 
   upstream.on('open', () => {
-    upstream.send(JSON.stringify(buildSettings({ deepseekKey: DEEPSEEK_API_KEY, documentText })));
+    upstream.send(JSON.stringify(buildSettings({ deepseekKey: DEEPSEEK_API_KEY, documentText, whatsapp: Boolean(whatsapp) })));
     for (const frame of pending.splice(0)) upstream.send(frame);
   });
 
@@ -155,12 +169,25 @@ function runSession(client, { id, ip, release, documentText }) {
   async function handleFunctions(msg) {
     for (const f of msg.functions || []) {
       if (!f.client_side) continue;
-      const result = f.name === 'buscar_sedes'
-        ? await withDeadline(buscarSedes(f.arguments, { token: DATOSGOV_APP_TOKEN }), TOOL_DEADLINE_MS)
-          .catch(() => ({ error: 'servicio_no_disponible' }))
-        : { error: 'funcion_desconocida' };
+      let result;
+      if (f.name === 'buscar_sedes') {
+        result = await withDeadline(buscarSedes(f.arguments, { token: DATOSGOV_APP_TOKEN }), TOOL_DEADLINE_MS)
+          .catch(() => ({ error: 'servicio_no_disponible' }));
+        if (result.sedes?.length) lastSedes = result;
+        sendClient({ type: 'ToolResult', name: f.name, result });
+        // The prompt alone did not make the model offer reliably; this flag on
+        // the first useful result does, and only once per session.
+        if (whatsapp && lastSedes === result && !offered) {
+          offered = true;
+          result = { oferta_whatsapp: 'Termina tu respuesta diciendo: Si quieres, te las envío por WhatsApp.', ...result };
+        }
+      } else if (f.name === 'enviar_whatsapp' && whatsapp) {
+        const v = validateWhatsApp(f.arguments, lastSedes);
+        result = v.error ? v : await whatsapp.send({ ipKey: limitKey, to: v.to, params: v.params });
+      } else {
+        result = { error: 'funcion_desconocida' };
+      }
       logEvent('tool_call', { id, name: f.name, error: result.error || null, total: result.total_sedes ?? null });
-      sendClient({ type: 'ToolResult', name: f.name, result });
       if (upstream.readyState === WebSocket.OPEN) {
         upstream.send(JSON.stringify({ type: 'FunctionCallResponse', id: f.id, name: f.name, content: JSON.stringify(result) }));
       }

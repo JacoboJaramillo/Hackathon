@@ -49,6 +49,11 @@ Solo nombres y propósito; los valores reales nunca se versionan (`.env.example`
 | `DEEPGRAM_API_KEY` | Sí | Autenticación contra la Voice Agent API de Deepgram |
 | `DEEPSEEK_API_KEY` | Sí | Clave de DeepSeek: el servidor se la entrega a Deepgram en `Settings` y la usa directamente para el brief |
 | `DATOSGOV_APP_TOKEN` | No | Token de aplicación de datos.gov.co (sin él aplican límites más bajos) |
+| `WHATSAPP_ACCESS_TOKEN` | No | Token de la WhatsApp Cloud API (secreto `whatsapp-access-token`). Con `WHATSAPP_PHONE_NUMBER_ID` activa el envío de sedes por WhatsApp (RF-024); sin alguno de los dos, la función no existe |
+| `WHATSAPP_PHONE_NUMBER_ID` | No | Identificador del número remitente en la Cloud API |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | No | Cuenta de WhatsApp Business; solo para administrar plantillas, el servidor no lo usa |
+| `WHATSAPP_API_VERSION` | No | Versión de la Graph API (`v25.0` por defecto) |
+| `WHATSAPP_MAX_PER_HOUR` | No | Tope global de mensajes por hora y por instancia (3 por defecto) |
 | `ALLOWED_ORIGINS` | En producción | Orígenes permitidos, separados por comas; vacía en producción rechaza todo |
 | `PORT` | No | Puerto HTTP (8080 en el contenedor) |
 | `SESSION_MAX_MS` | No | Duración máxima de una sesión de voz (10 min por defecto) |

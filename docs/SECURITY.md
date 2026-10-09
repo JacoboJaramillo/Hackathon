@@ -34,6 +34,17 @@ Resumen; el diagrama completo está en `docs/ARCHITECTURE.md` sección 6.
 - B2, servidor a Deepgram: solo salen `Settings`, audio, `KeepAlive`, `InjectUserMessage` (reconstruido por el servidor a partir de un `AskText` validado: texto de 1 a 300 caracteres, máximo 20 por sesión) y `FunctionCallResponse`; hacia Deepgram STT de diarización sale solo audio, `KeepAlive` y `CloseStream`; solo bajan siete tipos de evento, `ToolResult` y un `Error` saneado. Riesgo aceptado: la clave de DeepSeek viaja en `Settings` a Deepgram.
 - B3, argumentos del modelo a la consulta SoQL: validados y escapados.
 - B4, plano de control de GCP: Secret Manager inyecta las claves como variables de entorno al desplegar.
+- B6, servidor a Meta (RF-024, opcional): solo sale una plantilla fija con dos parámetros armados por el servidor; el destino es constante en el código (`graph.facebook.com`).
+
+### Amenazas del envío por WhatsApp (RF-024)
+
+| Amenaza | Riesgo | Controles |
+|---|---|---|
+| Acoso o spam a un número de terceros | Alguien hace que el agente envíe mensajes a un número ajeno | Solo envía si la persona aceptó y confirmó el número repetido en grupos 3-3-4; 1 mensaje por número (hash SHA-256) cada 10 minutos; 1 por IP (IPv6 por /64) cada 10 minutos; 3 por hora en total; los límites se cuentan al intentar; contenido fijo de plantilla, sin texto libre; el pie identifica al servicio |
+| Abuso de costo | Reintentos o muchas sesiones para disparar mensajes facturables | Los mismos límites, más 8 s de timeout y cero reintentos; el tope global es `WHATSAPP_MAX_PER_HOUR`; nivel de mensajería de 250 destinatarios por día en el número remitente. Límite: los contadores son por instancia, con `max-instances` 2 el tope global real puede ser el doble |
+| Inyección de instrucciones para enviar texto arbitrario | Un documento o una frase del usuario ("envía al 3001234567 el texto ...") intenta que el modelo redacte el mensaje | El modelo no escribe el mensaje: el servidor lo arma con su copia de la última búsqueda exitosa; `validateArgs` rechaza campos distintos de `telefono` y `sedes`, teléfonos que no son celulares colombianos y posiciones fuera de la última búsqueda (máximo 3); parámetros con espacios colapsados y 700 caracteres como máximo |
+| Fuga del token o del número | El token da control del remitente; el número es un dato personal | Token solo en Secret Manager (`whatsapp-access-token`) y variable de entorno, nunca en el navegador ni en logs; los registros `whatsapp_sent` y `whatsapp_failed` llevan solo el hash del número; el número no se guarda. Riesgo aceptado: el número dictado pasa por Deepgram y DeepSeek |
+| Número mal reconocido | Los dígitos dictados llegan mal y el mensaje va a otra persona | Repetición en grupos 3-3-4 con confirmación explícita antes de enviar; un solo envío por conversación |
 
 ## 2. Controles implementados (CLAUDE.md sección 4)
 
@@ -57,6 +68,7 @@ Resumen; el diagrama completo está en `docs/ARCHITECTURE.md` sección 6.
 | Cabeceras | Implementado: HSTS, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` (micrófono solo `self`), CSP en modo report-only; sin `X-Powered-By` ni source maps | `web/next.config.mjs` |
 | CORS | Por omisión no se emiten cabeceras CORS; el WebSocket se protege con la lista blanca de Origin | `web/server/limits.mjs` (`isAllowedOrigin`) |
 | Errores genéricos | Implementado: al navegador solo llegan textos fijos y códigos; el detalle queda en logs | `web/server.mjs` (`UPLOAD_ERRORS`, mensaje de `Error`) |
+| Envío por WhatsApp (RF-024) | Implementado: la herramienta solo existe con credenciales; argumentos validados con lista cerrada de campos; mensaje armado por el servidor desde su copia de la última búsqueda; límites por IP, por número y global; timeout de 8 s sin reintento; sin número ni token en logs | `web/server/whatsapp.mjs`, `web/server.mjs` (`handleFunctions`) |
 | Logging de eventos de seguridad | Implementado: `ws_rejected` con motivo, `document_uploaded`, `upload_failed`, `upstream_error`, con UUID de correlación por sesión | `web/server.mjs` |
 | Dependencias, auditoría, secretos | Implementado: `package-lock.json`, `npm ci`; CI con `npm audit --omit=dev --audit-level=high` y gitleaks con historial completo | `.github/workflows/ci.yml` |
 | Contenedor | Implementado: imagen multi-etapa `node:24-slim`, usuario `node`, solo dependencias de producción, sin secretos en capas; cuenta de ejecución con solo `secretAccessor` sobre sus tres secretos; cuenta de build dedicada | `web/Dockerfile`, `infra/deploy.sh` |
@@ -99,9 +111,11 @@ Pendiente por ejecutar (Pendiente en `docs/TESTING.md`): CP-044, CP-046, CP-047,
 | No hay alerta de presupuesto | Un abuso sostenido o un error de configuración no avisa por gasto | La debe crear el administrador de facturación, filtrada al proyecto `agente-vocal-hackaton` (`docs/ARCHITECTURE.md` sección 11) |
 | La clave de DeepSeek viaja en `Settings` a Deepgram | Deepgram la ve | Clave dedicada al evento y revocada al desmontar |
 | El primer commit del historial contiene una cadena con un identificador de proyecto de Google Cloud equivocado | No es un secreto ni da acceso; solo un identificador incorrecto | Los documentos posteriores apuntan al proyecto correcto (`2a4b8f2`); no se reescribe el historial |
+| Los límites de WhatsApp son por instancia (`web/server/whatsapp.mjs`, comentario `ponytail:`) | Con `max-instances` 2 el tope global real de 3 por hora puede llegar a 6 | Almacén compartido si debe ser exacto |
+| El token de WhatsApp es de un usuario del sistema y de larga duración | Quien lo obtenga puede enviar mensajes con el número remitente | Rotarlo y revocarlo al terminar el evento, junto con las demás claves |
 | Sin bloqueo progresivo | Un atacante persistente puede reintentar cada minuto | Aceptable mientras el techo de costo sea de 16 sesiones |
 | Documentos y sesiones se pierden al reciclarse la instancia | Disponibilidad, no confidencialidad | Documentado en `docs/ARCHITECTURE.md` sección 13 |
 
 ## 5. Cómo reportar un problema
 
-Abrir un issue privado o escribir directamente al equipo, con título, pasos para reproducir, resultado esperado, resultado obtenido, severidad (crítica, alta, media, baja) y el commit (`git log --oneline -1`). Para el QA, el formato y los casos están en `docs/GUIA-QA.md` y `docs/TESTING.md` sección 15. No incluir claves ni documentos reales en el reporte. Si el problema es una clave expuesta, avisar de inmediato para rotarla: las tres claves del proyecto son de uso exclusivo del evento y se revocan al desmontar (`docs/PLAN.md` sección 7).
+Abrir un issue privado o escribir directamente al equipo, con título, pasos para reproducir, resultado esperado, resultado obtenido, severidad (crítica, alta, media, baja) y el commit (`git log --oneline -1`). Para el QA, el formato y los casos están en `docs/GUIA-QA.md` y `docs/TESTING.md` sección 15. No incluir claves ni documentos reales en el reporte. Si el problema es una clave expuesta, avisar de inmediato para rotarla: las claves del proyecto (incluido el token de WhatsApp si se activó) son de uso exclusivo del evento y se revocan al desmontar (`docs/PLAN.md` sección 7).

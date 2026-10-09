@@ -20,6 +20,7 @@ flowchart LR
     dg["Deepgram - recibe audio (agente y STT diarizado) y la clave de DeepSeek"]
     ds["DeepSeek - recibe texto de la conversación, del documento y de cada intervención"]
     dt["datos.gov.co - recibe municipio y tipo de atención"]
+    wa["Meta WhatsApp Cloud API - recibe el número de destino y la lista de sedes"]
   end
 
   subgraph z4["Zona 4 - plano de control de GCP"]
@@ -40,5 +41,6 @@ flowchart LR
   docs -- "B2: texto del documento cercado como datos" --> ds
   proxy -- "B3: argumentos validados y literales escapados" --> tool
   tool --> dt
+  proxy -- "B3: teléfono y posiciones validados; el texto lo arma el servidor" --> wa
   sm -- "B4: inyección al desplegar" --> env
   iam --> sm

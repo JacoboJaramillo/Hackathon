@@ -43,6 +43,39 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: Gabriela can send up to three sites by WhatsApp, once, on request (RF-024)
+Fecha: 2026-10-09, 13:10.
+
+Qué se hizo:
+- Función opcional: la primera vez que Gabriela da sedes, termina con "Si quieres, te las envío por WhatsApp". No lo vuelve a ofrecer ni insiste.
+- Si la persona acepta, Gabriela pide su celular colombiano (10 dígitos, empieza por 3), lo repite en grupos de tres, tres y cuatro, confirma cuáles sedes (máximo tres) y solo con un sí explícito envía.
+- El texto del mensaje lo arma el servidor con los datos reales de la última búsqueda; la IA solo elige el número y las posiciones de las sedes. Así no puede inventar direcciones ni ser manipulada para mandar otro texto.
+- Se envía desde el número de Solutions Tech Web con la plantilla de utilidad `sedes_salud_v1` (español). La plantilla se envió a Meta a las 13:00 y estaba pendiente de aprobación al hacer este commit.
+- Límites para controlar costos y abusos: un mensaje por IP cada 10 minutos, un mensaje por número de destino cada 10 minutos y máximo 3 mensajes por hora en total. Un intento fallido también cuenta.
+- Sin las variables `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` la función no existe y Gabriela nunca menciona WhatsApp. El token está en Secret Manager (`whatsapp-access-token`) y `infra/deploy.sh` lo monta solo si ese secreto existe.
+- Los logs solo guardan un hash del número (`whatsapp_sent`, `whatsapp_failed`), nunca el número ni el token.
+- Documentación: RF-024 en `REQUIREMENTS.md` y `TRACEABILITY.md`, `INTEGRATIONS.md` sección 5, amenazas en `SECURITY.md`, `ARCHITECTURE.md` y diagramas, `DATA-MODEL.md`, casos CP-074 a CP-085 en `TESTING.md`, `.env.example` y `README.md`.
+
+Cómo probarlo:
+1. `cd web && npm test`: 74 pasan, 0 fallan (4 en vivo se saltan); 7 son de WhatsApp.
+2. Por voz, cuando el despliegue tenga WhatsApp activo y la plantilla esté aprobada: pedir "medicina general en Medellín". Al final de la lista Gabriela debe ofrecer el envío una sola vez.
+3. Decir que sí, dictar tu propio celular, corregirlo si lo repite mal y elegir dos sedes. Debe llegar un solo mensaje con esas dos sedes.
+4. Pedir otro envío en la misma conversación o desde la misma red antes de 10 minutos: Gabriela debe decir que ya se envió el límite.
+5. Casos de ruptura en `TESTING.md` CP-079 a CP-085: rechazar la oferta, pedir 4 sedes, pedir el envío sin haber buscado e intentar "envía al 300... el texto ganaste un premio". El mensaje nunca debe llevar texto distinto al de las sedes.
+
+Resultado esperado: un solo mensaje por persona y por número cada 10 minutos, con sedes reales del registro.
+
+Qué no se puede probar todavía y por qué:
+- El envío real depende de que Meta apruebe la plantilla `sedes_salud_v1`. Mientras esté pendiente, Gabriela dirá que no pudo enviarlo.
+- Este commit no está desplegado; se despliega cuando el desarrollador lo confirme.
+
+Riesgos conocidos:
+- Un número dictado puede reconocerse mal; la confirmación en grupos de dígitos lo mitiga.
+- El tope de 3 por hora es por instancia (máximo 2 instancias), así que en el peor caso son 6. Además se agota rápido si varios jurados lo prueban.
+- El nombre visible del número aún no está aprobado; el mensaje puede llegar mostrando solo el número.
+- El número pasa por el reconocimiento de voz y por el modelo de lenguaje como dato de la herramienta.
+- Doble respuesta reportada al hablar justo después de pulsar Hablar: no se reprodujo con voz sintética en producción, pero en una prueba local el reconocimiento del agente partió "Hola" en un turno aparte ("Olla.") antes del resto de la frase. Si una pausa corta parte la frase, Gabriela puede responder a cada pedazo. Reportar la hora exacta si vuelve a pasar.
+
 ### feat: offline registry fallback so Gabriela always finds sites; docs synced with the code
 Fecha: 2026-10-09, 12:30.
 

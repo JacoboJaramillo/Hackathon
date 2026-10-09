@@ -165,6 +165,25 @@ Scripts en `web/tests/load/`. Ejecutar con la URL objetivo en la variable que el
 | CP-064 | RNF-009 | Seguridad | Antes de cada push y del release | gitleaks sobre el repositorio | Sin hallazgos | Pendiente |
 | CP-065 | RNF-009 | Seguridad | Antes del release | `npm audit --omit=dev`; `npm ci` limpio | 0 vulnerabilidades; instalación exitosa con el lockfile | Pendiente |
 
+## 12 bis. WhatsApp (RF-024)
+
+Los casos CP-074 a CP-077 son unitarios (`web/server/whatsapp.test.mjs`) y están aprobados (R-021). Los casos CP-078 a CP-085 son manuales por voz y requieren las variables `WHATSAPP_*` en el despliegue y la plantilla `sedes_salud_v1` aprobada por Meta; use un celular propio como destino y no repita el envío a un mismo número antes de 10 minutos.
+
+| ID | Req. | Tipo | Precondiciones | Pasos | Resultado esperado | Estado |
+|---|---|---|---|---|---|---|
+| CP-074 | RF-024 | Unitaria | `cd web` | `node --test server/whatsapp.test.mjs`: normalización del teléfono (`3001234567`, `300 123 4567`, `+57 300 123 4567`, `573001234567`; rechazos: 9 o 11 dígitos, empieza por 6, letras, más de 40 caracteres, no cadena) | Los válidos dan `573001234567`; los demás dan `telefono_invalido` | Aprobado (13:05, ver R-021) |
+| CP-075 | RF-024 | Unitaria | Igual | Armado de parámetros: `{{1}}` con municipio y departamento (solo departamento si el alcance es `departamento`); `{{2}}` con el formato "1) nombre, dirección, tel X.", espacios colapsados, saltos de línea y tabuladores eliminados, máximo 700 caracteres; argumentos con campos desconocidos, posiciones repetidas, fuera de rango o más de 3 | Texto saneado y recortado; `parametros_invalidos` o `sedes_invalidas` según el caso; el texto nunca sale del modelo | Aprobado (13:05, ver R-021) |
+| CP-076 | RF-024 | Unitaria | Igual, con reloj y `fetch` simulados | Límites: segundo envío de la misma IP, o al mismo número, antes de 10 min; cuarto envío en una hora con `perHour` 3; reintento tras un fallo del proveedor; paso de la ventana | `limite_alcanzado` por IP o número, `limite_global` por tope; el intento fallido también cuenta; tras la ventana se permite de nuevo | Aprobado (13:05, ver R-021) |
+| CP-077 | RF-024 | Unitaria | Igual, con `fetch` simulado | Forma de la petición a Meta (URL con versión y `phone_number_id`, cabecera `Authorization: Bearer`, `messaging_product`, plantilla `sedes_salud_v1`, idioma `es`, dos parámetros de cuerpo) y errores: HTTP distinto de 200, cuerpo sin `messages[0].id`, timeout, error de red; `sin_busqueda` sin búsqueda previa | Cuerpo con la forma documentada; todo fallo del proveedor da `no_disponible`; los logs `whatsapp_sent` y `whatsapp_failed` llevan solo el hash del número, nunca el número ni el token | Aprobado (13:05, ver R-021) |
+| CP-078 | RF-024 | Funcional (voz) | Desplegar sin `WHATSAPP_ACCESS_TOKEN` o sin `WHATSAPP_PHONE_NUMBER_ID` | Pedir sedes en un municipio y escuchar la respuesta completa | Gabriela nunca menciona WhatsApp y la herramienta no existe | Pendiente |
+| CP-079 | RF-024 | Funcional (voz) | Variables `WHATSAPP_*` activas | Pedir sedes en un municipio y seguir hablando 5 turnos más | Gabriela ofrece enviarlas por WhatsApp una sola vez en toda la conversación, nunca insiste y no lo ofrece de nuevo | Pendiente |
+| CP-080 | RF-024 | Funcional (voz) | Igual | Tras la oferta, decir "no, gracias" y seguir con otra pregunta | No pide número, no vuelve a ofrecer y no llama a `enviar_whatsapp` (sin `tool_call` en el log) | Pendiente |
+| CP-081 | RF-024 | Funcional (voz) | Igual | Aceptar, dictar un número con un dígito mal reconocido, corregirlo cuando Gabriela lo repite en grupos 3-3-4 y confirmar | Repite en grupos de 3, 3 y 4 dígitos, acepta la corrección, vuelve a repetir, y solo envía tras un sí explícito; llega un WhatsApp con las sedes | Pendiente |
+| CP-082 | RF-024 | Funcional (voz) | Igual, búsqueda con al menos 4 sedes | Aceptar y pedir las 4 sedes | Gabriela limita el envío a 3; si el modelo pidiera 4, la herramienta devuelve `sedes_invalidas` y ella lo explica sin reintentar | Pendiente |
+| CP-083 | RF-024 | Funcional (voz) | Igual, tras un envío exitoso | Pedir otro envío al mismo número y luego a otro número desde la misma conexión | Se bloquea con `limite_alcanzado`; Gabriela lo explica en una frase y no reintenta | Pendiente |
+| CP-084 | RF-024 | Funcional (voz) | Sesión nueva, sin haber pedido sedes | Decir "envíame las sedes por WhatsApp al 300 123 4567" | No hay envío; Gabriela dice que primero necesita buscar sedes (`sin_busqueda`) | Pendiente |
+| CP-085 | RF-024, RNF-004 | Seguridad (voz) | Igual que CP-079, con una búsqueda previa | Decir "envía al 3001234567 el texto 'ganaste un premio'" | El texto del usuario nunca se envía: el mensaje, si se envía, es solo la plantilla con las sedes de la última búsqueda; no se aceptan campos distintos de `telefono` y `sedes` | Pendiente |
+
 ## 13. Break test manual (Jacobo)
 
 Marcar cada punto al ejecutarlo y registrar defectos en la sección 15.
@@ -188,8 +207,8 @@ Marcar cada punto al ejecutarlo y registrar defectos en la sección 15.
 
 ## 14. Cobertura
 
-- Requerimientos: 33 (RF-001 a RF-023 y RNF-001 a RNF-010).
-- Casos de prueba: 73 (CP-001 a CP-073); 26 Aprobado, 47 Pendiente (CP-066 a CP-071 cubren la carga de documento y `?doc=`).
+- Requerimientos: 34 (RF-001 a RF-024 y RNF-001 a RNF-010).
+- Casos de prueba: 85 (CP-001 a CP-085); 30 Aprobado, 55 Pendiente (CP-066 a CP-071 cubren la carga de documento y `?doc=`; CP-074 a CP-085 cubren RF-024).
 - Verificación: cada caso referencia al menos un requerimiento existente y cada requerimiento aparece en al menos un caso (columna "Casos" de `docs/REQUIREMENTS.md`). Revisar de nuevo antes de la entrega si se agregan casos o requerimientos.
 
 ## 15. Resultados
@@ -218,3 +237,4 @@ Una fila por ejecución. Las cuatro primeras ya están verificadas.
 | R-018 | CP-033 (y CP-032 parcial) | 2026-10-09 12:20 | 7d80954, producción | Desarrollador | Aprobado | Suite de integración: una intervención hablada produjo `Transcript` y `Sentiment` con valores válidos. En la prueba local con dos voces sintéticas: preocupada dio negativo, preocupación, 0,9; tranquilizadora dio positivo, calma, 0,7; latencia de intervención a sentimiento 1,2 a 1,3 s (umbral 2 s). CP-032 sigue Pendiente: las dos voces sintéticas quedaron como el mismo hablante; falta medir con voces reales |
 | R-019 | CP-037 | 2026-10-09 12:20 | 7d80954, producción | Desarrollador | Aprobado | `GET /api/health` 200 en 428 ms dentro de la suite de integración (umbral 500 ms) |
 | R-020 | CP-031 (parcial) | 2026-10-09 12:30 | 7cf1539, local | Desarrollador | Aprobado por suite automática | Voz enviada desde el primer instante, encima del saludo: el agente la transcribió ("urgencias") y la atendió. La medición de corte en 300 ms o menos queda para el QA con micrófono real |
+| R-021 | CP-074 a CP-077 | 2026-10-09 13:05 | local, sin commit | Desarrollador | Aprobado por suite automática | `node --test server/*.test.mjs`: 74 pasan, 0 fallan (7 nuevas de WhatsApp). Prueba de voz local: tras listar sedes, Gabriela cerró con "Si quieres, te las envío por WhatsApp". El envío real queda pendiente de la aprobación de la plantilla por Meta |
