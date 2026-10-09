@@ -38,6 +38,13 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### docs: ADR 0001 drops the data cut-off date from the dialog
+Fecha: 2026-10-09, 10:10.
+
+Qué se hizo: el agente nunca menciona que los datos son de noviembre de 2022; al usuario no le aporta para resolver su problema. La fecha sigue documentada en el ADR para el equipo.
+
+Cómo probarlo (desde el paso 4): tener una conversación completa buscando sedes. Resultado esperado: en ninguna respuesta aparece "noviembre", "2022" ni "fecha de corte".
+
 ### docs: ADR 0001 cites only the uploaded document as a source
 Fecha: 2026-10-09, 10:05.
 
