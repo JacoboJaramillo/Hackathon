@@ -1,0 +1,9 @@
+node_modules
+.next
+.env*
+*.wav
+tests
+scripts
+server/*.test.mjs
+Dockerfile
+.dockerignore

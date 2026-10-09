@@ -9,7 +9,12 @@ Para reportar un defecto: título, pasos para reproducir, resultado esperado, re
 1. Clonar: `git clone https://github.com/JacoboJaramillo/Hackathon.git` y entrar a la carpeta.
 2. Crear el archivo `.env` en la raíz copiando `.env.example`. Los valores reales los entrega el desarrollador en persona o por un canal privado, nunca por el repositorio ni por chat de grupo.
 3. Instalar dependencias: `cd web` y luego `npm ci` (usa el lockfile, instala versiones exactas).
-4. Levantar en local: `npm run dev` y abrir `http://localhost:3000`.
+4. Levantar en local: `npm run dev` (lee `../.env`) y abrir `http://localhost:3000`.
+5. Pruebas unitarias: `npm test`.
+
+URL pública: https://agente-vocal-583590264456.us-east1.run.app
+
+Documentos de QA: `docs/REQUIREMENTS.md` (33 requerimientos), `docs/TEST-PLAN.md` (plan) y `docs/TESTING.md` (65 casos y resultados).
 
 Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
@@ -19,8 +24,8 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 |---|---|---|
 | 0 | Repositorio seguro y secretos en la nube | Hecho |
 | 1 | Prueba del riesgo mayor: agente de voz en español con DeepSeek y la herramienta IPS | Hecho (plan A confirmado) |
-| 2 | Esqueleto desplegado con URL pública | Siguiente |
-| 3 | Subida de documento y brief de 3 a 5 preguntas | Pendiente |
+| 2 | Esqueleto desplegado con URL pública | Hecho |
+| 3 | Subida de documento y brief de 3 a 5 preguntas | Siguiente |
 | 4 | Conversación por voz completa sobre el documento y la herramienta IPS | Pendiente |
 | 5 | Transcripción diarizada y panel de sentimiento | Pendiente |
 | 6 | Pulido de UX | Pendiente |
@@ -37,6 +42,48 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 ---
 
 ## Entradas
+
+### feat: voice proxy server, buscar_sedes tool, Cloud Run deploy and QA suite
+Fecha: 2026-10-09, 10:40.
+
+Qué se hizo:
+- Servidor propio (`web/server.mjs`) que hace de intermediario entre el navegador y el agente de voz de Deepgram por `/ws/agent`. Las claves nunca salen del servidor.
+- Herramienta `buscar_sedes` (`web/server/ips.mjs`): convierte la necesidad en tipos de atención, corrige el municipio mal escrito o mal transcrito ("Letizia" a LETICIA), busca en datos.gov.co y nunca devuelve gerente ni correo.
+- Protecciones del WebSocket: solo acepta el origen de la propia página, máximo 2 sesiones por IP, 8 en total, 10 conexiones por minuto por IP, 10 minutos por sesión, mensajes de máximo 64 KB, y solo audio o `KeepAlive` desde el navegador.
+- Cabeceras de seguridad, `/api/health`, contenedor sin root y cuenta de servicio con permiso solo para leer los 3 secretos.
+- Despliegue en Cloud Run: https://agente-vocal-583590264456.us-east1.run.app (todavía muestra la plantilla de Next.js; la interfaz llega en los pasos 3 a 5).
+- Documentos de QA: requerimientos, plan de pruebas y 65 casos. Scripts k6 en `web/tests/load/`.
+
+Resultados (todos contra producción):
+
+| Prueba | Resultado |
+|---|---|
+| Unitarias (`npm test`) | 21 de 21 |
+| Integración del proxy (7 pruebas, incluye una conversación real) | 7 de 7 |
+| Humo k6 | p95 170 ms, 0 % errores |
+| Carga k6, 20 usuarios | p95 360 ms, 0 de 2.858 con error |
+| Estrés k6, hasta 150 usuarios | p95 252 ms, 0 de 15.650 con error |
+| Picos k6, 120 usuarios | p95 176 ms, 0 de 4.168 con error |
+| Límites WebSocket k6 | Origen ajeno rechazado, tercera sesión rechazada |
+| Consola de Chrome | Sin errores ni violaciones de CSP |
+
+Cómo probarlo:
+1. `cd web && npm ci && npm test`: 21 pruebas pasan.
+2. Integración contra producción (abre sesiones reales, usar con moderación): `U=https://agente-vocal-583590264456.us-east1.run.app; BASE_URL=$U ORIGIN=$U node --env-file=../.env --test tests/integration/proxy.test.mjs`.
+3. Carga y estrés: seguir `web/tests/load/README.md` (Docker con `grafana/k6:2.2.0`).
+4. Cabeceras: `curl -sI https://agente-vocal-583590264456.us-east1.run.app`. Deben verse las 6 cabeceras de seguridad y no `x-powered-by`.
+5. Archivos expuestos: `/.env`, `/.git/config`, `/package.json` y `/server.mjs` deben responder 404.
+
+No se puede probar todavía: la interfaz (micrófono, tarjetas, transcripción). Ver los casos Pendiente en `docs/TESTING.md`.
+
+Defectos encontrados y corregidos en este paso:
+- El filtro por naturaleza (pública o privada) no devolvía nada porque comparaba en mayúsculas con tilde. Se corrigió a comparación exacta y se verificó en vivo.
+- El primer despliegue mostraba `x-powered-by: Next.js` porque la imagen no incluía la configuración de Next. Se corrigió y se verificó en producción.
+
+Riesgos conocidos:
+- El estrés no encontró el punto de quiebre con 150 usuarios; solo mide páginas, no sesiones de voz (esas cuestan dinero y están limitadas a 8).
+- Los límites están en memoria: con 2 instancias, el tope real puede ser el doble.
+- HTTP redirige a HTTPS con 302 (lo hace Cloud Run, no se puede cambiar a 301).
 
 ### docs: ADR 0001 drops the data cut-off date from the dialog
 Fecha: 2026-10-09, 10:10.
