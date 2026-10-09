@@ -190,7 +190,8 @@ function runSession(client, { id, ip, release, documentText }) {
       } else return close(1008, 'invalid_message');
     }
     if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: isBinary });
-    else if (pending.length < 50) pending.push(data);
+    // Matches the browser's 4 s early-speech buffer while Deepgram connects.
+    else if (pending.length < 100) pending.push(data);
     if (isBinary) diarizer.send(data);
   });
   client.on('close', () => close(1000, 'client_closed'));

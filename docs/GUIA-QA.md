@@ -43,6 +43,22 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### fix: keep speech said while connecting so the greeting does not cut the person off
+Fecha: 2026-10-09, 12:27.
+
+Qué se hizo: al pulsar Hablar hay unos segundos de conexión antes del saludo de Gabriela. Lo que la persona decía en ese lapso se perdía y luego el saludo le hablaba encima. Ahora el navegador guarda hasta 4 s de voz mientras conecta y lo envía apenas abre la conexión (el servidor también guarda 4 s mientras conecta con Deepgram). Si la persona habla durante el saludo, Gabriela se calla y la escucha (decisión del equipo: saludo interrumpible).
+
+Cómo probarlo:
+1. Pulsar "Hablar con Gabriela" y, sin esperar el saludo, decir "Necesito urgencias en Leticia".
+2. Gabriela debe cortar el saludo (o no alcanzar a decirlo) y responder con sedes de Leticia.
+3. Prueba automática: `BASE_URL=... ORIGIN=... node --env-file=../.env --test --test-name-pattern="RF-005" tests/integration/proxy.test.mjs` (abre una sesión pagada).
+
+Resultado esperado: la frase dicha encima del saludo aparece en la transcripción y se responde.
+
+Qué no se puede probar todavía: nada pendiente.
+
+Riesgos conocidos: más de 4 s de voz antes de que conecte se recortan al inicio. Nombres poco frecuentes como "Quibdó" a veces se transcriben mal; decir el departamento ("Quibdó, Chocó") ayuda.
+
 ### feat: Gabriela redesign, diarized transcript, live sentiment, tap-to-ask and directions
 Fecha: 2026-10-09, 12:18.
 

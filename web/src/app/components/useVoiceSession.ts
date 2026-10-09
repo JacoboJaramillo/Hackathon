@@ -202,12 +202,18 @@ export function useVoiceSession(documentId: string | null, onSedes: (r: SedesRes
       setStatus("idle");
     };
 
+    // Speech said while the connection opens is kept (up to 4 s of 40 ms
+    // frames) and sent on open, so a person who starts talking right after
+    // pressing the button is not cut off by the greeting.
+    const early: ArrayBuffer[] = [];
     node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
+      else if (early.length < 100) early.push(e.data);
     };
 
     ws.onopen = () => {
       opened = true;
+      for (const frame of early.splice(0)) ws.send(frame);
       setStatus("listening");
     };
 

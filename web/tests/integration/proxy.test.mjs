@@ -312,3 +312,37 @@ test('RF-002 RF-003 a tapped brief question is answered from the document', { sk
     ws.terminate();
   }
 });
+
+test('RF-005 speech that starts before or during the greeting is not lost', { skip: skip || (!DEEPGRAM_API_KEY && 'needs DEEPGRAM_API_KEY'), timeout: 60_000 }, async () => {
+  await new Promise((r) => setTimeout(r, 1500));
+  const audio = await speech('Necesito urgencias en el municipio de Leticia.');
+  const { ws, status } = await open();
+  assert.equal(status, 101);
+  // Talk from the first frame, over the greeting.
+  let queue = audio;
+  const pacer = setInterval(() => {
+    const frame = Buffer.alloc(FRAME);
+    if (queue.length) {
+      queue.subarray(0, FRAME).copy(frame);
+      queue = queue.subarray(FRAME);
+    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(frame);
+  }, 20);
+  const events = [];
+  try {
+    const heard = await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`timeout; events: ${events.join(' | ')}`)), 45_000);
+      ws.on('message', (data, isBinary) => {
+        if (isBinary) return;
+        const m = JSON.parse(data.toString());
+        events.push(m.type === 'ConversationText' ? `${m.role}: ${m.content}` : m.type);
+        if (m.type === 'ConversationText' && m.role === 'user') { clearTimeout(t); resolve(m.content); }
+      });
+      ws.on('close', (c) => reject(new Error(`closed ${c}; events: ${events.join(' | ')}`)));
+    });
+    assert.match(heard, /urgencias/i, events.join(' | '));
+  } finally {
+    clearInterval(pacer);
+    ws.terminate();
+  }
+});
