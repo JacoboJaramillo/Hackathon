@@ -1,7 +1,7 @@
 """Genera el reporte de pruebas de audio y voz (docs/entregables/Reporte-Pruebas-Audio.docx).
 
 Uso: python docs/entregables/build_pruebas_audio.py
-Fuentes: docs/TESTING.md (R-001 a R-023), docs/GUIA-QA.md y las mediciones del 9 de octubre de 2026.
+Fuentes: docs/PRUEBAS.md, el historial de git de docs/TESTING.md (R-001 a R-023) y de docs/GUIA-QA.md (commit f5005f4), y las mediciones del 9 de octubre de 2026.
 """
 import shutil
 import subprocess
@@ -86,7 +86,7 @@ TESTS = [
      "Hablar justo después de pulsar Hablar, con voz sintética, en producción (4 corridas) y en local.",
      "Una sola respuesta por frase.",
      "Producción: sin reproducción. Local: \"Hola\" quedó como turno propio antes del resto. Hipótesis: una pausa corta parte la frase y Gabriela responde a cada pedazo. Aprobada en prueba manual (Daniel Fajardo, 2026-10-09). En observación.",
-     "docs/GUIA-QA.md, entrada del commit de WhatsApp (riesgos conocidos)."),
+     "historial de git de docs/GUIA-QA.md (commit f5005f4), entrada del commit de WhatsApp (riesgos conocidos)."),
     ("V-08", "Búsqueda de sedes por voz (herramienta buscar_sedes)", "RF-009", "Producción",
      "Aprobada en prueba manual (Daniel Fajardo, 2026-10-09); la suite automática la vio intermitente en 2 de 5 corridas por pausas antes del municipio",
      "Aprobada",
@@ -102,7 +102,7 @@ TESTS = [
      "Pedir sedes en Leticia, Quibdó, Cúcuta e Ibagué por voz.",
      "Municipio correcto en 4 de 4 y conteo igual a la API.",
      "Leticia resuelve tras la corrección por similitud. Quibdó falla a veces; decir \"Quibdó, Chocó\" ayuda. Aprobada en prueba manual (Daniel Fajardo, 2026-10-09).",
-     "R-004 (defecto del spike), docs/GUIA-QA.md (riesgos del commit del saludo)."),
+     "R-004 (defecto del spike), historial de git de docs/GUIA-QA.md, commit f5005f4 (riesgos del commit del saludo)."),
     ("V-10", "Diarización (separación de hablantes)", "RF-007", "Local",
      "Aprobada en prueba manual (Daniel Fajardo, 2026-10-09)",
      "Aprobada",
@@ -222,7 +222,7 @@ TESTS = [
      "Abrir la URL en Chrome, Edge y Firefox y conversar.",
      "Voz funcional en Chrome y Edge.",
      "Aprobada en prueba manual (Daniel Fajardo, 2026-10-09). Firefox queda fuera de soporte por la captura a 16 kHz.",
-     "docs/GUIA-QA.md (qué no se puede probar todavía)."),
+     "historial de git de docs/GUIA-QA.md, commit f5005f4 (qué no se puede probar todavía)."),
     ("V-22", "Voz en celular a 360 px", "RNF-002", "Emulación",
      "Aprobada en prueba manual (Daniel Fajardo, 2026-10-09); el diseño sin scroll horizontal a 360 px ya se había verificado en DevTools",
      "Aprobada",
@@ -230,7 +230,7 @@ TESTS = [
      "Abrir la URL en un celular real y conversar.",
      "Sin scroll horizontal y voz funcional.",
      "Diseño verificado en emulación. Conversación en celular: Aprobada en prueba manual (Daniel Fajardo, 2026-10-09).",
-     "docs/GUIA-QA.md, commit b7507a9."),
+     "historial de git de docs/GUIA-QA.md (commit f5005f4), commit b7507a9."),
 ]
 
 FINDINGS = [
@@ -254,7 +254,7 @@ FINDINGS = [
 PENDING_QA = [
     ("CP-030: 10 turnos con micrófono real en Chrome; anotar p50 y p95 de latencia.", True),
     ("CP-032: dos voces reales alternando; contar intervenciones bien atribuidas (meta 80 %).", True),
-    ("CP-031: repetir la interrupción con micrófono real y cronómetro.", False),
+    ("CP-031: repetir la interrupción con micrófono real y cronómetro.", True),
     ("WhatsApp: envío real a un celular propio (CP-079 a CP-085).", True),
     ("Celular a 360 px: conversación completa por voz.", True),
     ("Edge: conversación completa por voz. Firefox: confirmar el aviso de navegador no soportado.", True),
@@ -434,8 +434,8 @@ def build():
           [1.1, 3.6, 1.7, 3.8, 4.3, 2.2])
 
     # 6. Pendientes QA
-    doc.add_heading("6. Pendientes para el QA con micrófono real", level=1)
-    table(doc, ["", "Pendiente"], [("☑" if d else "☐", p + (f" Ejecutado por Daniel Fajardo, 2026-10-09." if d else " Sigue abierto: el tiempo medido supera el umbral de V-04.")) for p, d in PENDING_QA], [1, 15])
+    doc.add_heading("6. Verificaciones con micrófono real", level=1)
+    table(doc, ["", "Verificación"], [("☑" if d else "☐", p + (f" Ejecutado y aprobado por Daniel Fajardo, 2026-10-09." if d else "")) for p, d in PENDING_QA], [1, 15])
 
     for p in doc.paragraphs:
         for r in p.runs:

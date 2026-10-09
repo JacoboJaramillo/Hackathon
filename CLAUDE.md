@@ -108,13 +108,12 @@ Mínima, viva y en el repositorio. Nada que se desactualice en horas.
 | `docs/adr/NNNN-titulo.md` | Una decisión por archivo (contexto, decisión, consecuencias). Obligatorio para stack, arquitectura y autenticación. |
 | `docs/api/openapi.yaml` | Contrato de la API. Fuente de verdad, se escribe antes del código. |
 | `docs/SECURITY.md` | Modelo de amenazas breve, controles implementados, resultados de auditoría, deuda de seguridad conocida. |
-| `docs/REQUIREMENTS.md` | Requerimientos con ID único (RF-001 funcionales, RNF-001 no funcionales), prioridad y criterio de aceptación. Pendiente de recibir. |
-| `docs/TRACEABILITY.md` | Matriz de trazabilidad (ver sección 5.3). |
 | `docs/diagrams/` | Generador de los diagramas (`code/build.py`) y sus imágenes (`img/*.png`). |
 | `docs/PRUEBAS-AUDIO.md` | Reporte de pruebas de audio y voz con lista de verificación. |
 | `docs/QA-CONVERSACIONES.md` | Guion de frases para intentar romper el agente. |
 | `docs/entregables/` | Documentos Word entregables y los scripts que los generan. |
-| `docs/GUIA-QA.md` | Bitácora por commit: qué se hizo y cómo probarlo paso a paso. Es lo primero que lee el QA. |
+| `docs/PRUEBAS.md` | Registro detallado de todas las pruebas. |
+| `docs/CODIGO.md` | Documentación del código archivo por archivo. |
 | `.env.example` | Todas las variables con valores falsos. Nunca valores reales. |
 | `CHANGELOG.md` | Cambios por versión. |
 
@@ -139,7 +138,7 @@ Orden de la presentación: problema, requerimientos, arquitectura (recorrido sob
 ### 5.3 Trazabilidad de requerimientos
 
 - Cada requerimiento tiene ID estable y criterio de aceptación medible.
-- `docs/TRACEABILITY.md` es una tabla: Requerimiento, Componente o módulo, Endpoint, Entidad de datos, Caso(s) de prueba, Estado, Evidencia.
+- La trazabilidad vive en `docs/PRUEBAS.md` (requerimiento por prueba) y en `docs/ARQUITECTURA.md` sección 2 (requerimientos y umbrales).
 - Cada commit, endpoint del OpenAPI (`x-requirement`) y caso de prueba referencia su ID de requerimiento. Los tests llevan el ID en el nombre o etiqueta.
 - Regla: ningún requerimiento sin al menos un caso de prueba, y ningún caso de prueba sin requerimiento. Se revisa la matriz antes de la entrega.
 - Los requerimientos no funcionales (rendimiento, seguridad, disponibilidad) llevan un umbral numérico verificable.
@@ -205,7 +204,7 @@ Reglas:
 - Ramas cortas por tarea; PR revisado por la otra persona o por `/code-review` antes de merge.
 - CI mínimo: lint, pruebas, escaneo de secretos y de dependencias.
 - Definición de hecho: funciona, tiene prueba, pasa lint, sin secretos, documentado si cambió el contrato.
-- **Regla obligatoria de cada commit:** el mismo commit agrega una entrada al inicio de `docs/GUIA-QA.md` (la más reciente arriba). La entrada lleva el título del commit, la fecha y hora, qué se hizo en lenguaje simple, cómo probarlo paso a paso con comandos copiables, el resultado esperado, qué no se puede probar todavía y por qué, y los riesgos conocidos. Nunca incluye secretos ni valores del `.env`. Un commit sin su entrada no está terminado. Objetivo: que el QA (Jacobo) siga el proyecto sin depender del chat.
+- Cada cambio que afecte el comportamiento actualiza docs/PRUEBAS.md con su prueba y resultado.
 - Reparto: el desarrollador construye; el QA escribe casos desde el contrato OpenAPI en paralelo, prueba contra los criterios de aceptación y ejecuta el break test.
 - Congelar funcionalidades unas horas antes de la entrega; ese tiempo es para auditoría, pruebas y demo.
 

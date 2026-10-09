@@ -89,7 +89,7 @@ Hallazgos corregidos en el commit `050e436` (`security: audit fixes for uploads 
 
 Hallazgos de severidad baja (L): se aceptan sin corregir cuando el costo de arreglarlos supera el riesgo en un servicio de un evento, sin datos persistentes. Los aceptados y verificables en el código son:
 
-- Un PDF hostil todavía consume CPU hasta 10 s en el worker. La voz no se congela (el event loop principal queda libre) pero puede ir algo más lenta en ese lapso (`docs/GUIA-QA.md`, entrada del commit `050e436`). Mitigación: 5 cargas por minuto y 1 simultánea por IP, 4 globales.
+- Un PDF hostil todavía consume CPU hasta 10 s en el worker. La voz no se congela (el event loop principal queda libre) pero puede ir algo más lenta en ese lapso (historial de git de `docs/GUIA-QA.md`, commit `f5005f4`, entrada del commit `050e436`). Mitigación: 5 cargas por minuto y 1 simultánea por IP, 4 globales.
 - `Origin` es falsificable fuera del navegador. La lista blanca impide el uso desde el navegador de una víctima; contra scripts quedan cupos, tasa y duración máxima (ADR 0004).
 - Las rutas HTTP de páginas no tienen rate limit de aplicación. No generan costo en proveedores; el techo lo da Cloud Run (`max-instances` 2, `concurrency` 40, `docs/ARQUITECTURA.md` sección 10).
 
@@ -118,4 +118,4 @@ Pendiente por ejecutar (Pendiente según el historial de git de `docs/TESTING.md
 
 ## 5. Cómo reportar un problema
 
-Abrir un issue privado o escribir directamente al equipo, con título, pasos para reproducir, resultado esperado, resultado obtenido, severidad (crítica, alta, media, baja) y el commit (`git log --oneline -1`). Para el QA, el formato y los casos están en `docs/GUIA-QA.md` y `docs/QA-CONVERSACIONES.md`; el break test original está en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas). No incluir claves ni documentos reales en el reporte. Si el problema es una clave expuesta, avisar de inmediato para rotarla: las claves del proyecto (incluido el token de WhatsApp si se activó) son de uso exclusivo del evento y se revocan al desmontar (`docs/PLAN.md` sección 7).
+Abrir un issue privado o escribir directamente al equipo, con título, pasos para reproducir, resultado esperado, resultado obtenido, severidad (crítica, alta, media, baja) y el commit (`git log --oneline -1`). Para el QA, el formato y los casos están en `docs/PRUEBAS.md` y `docs/QA-CONVERSACIONES.md`; el break test original está en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas). No incluir claves ni documentos reales en el reporte. Si el problema es una clave expuesta, avisar de inmediato para rotarla: las claves del proyecto (incluido el token de WhatsApp si se activó) son de uso exclusivo del evento y se revocan al desmontar (`docs/PLAN.md` sección 7).

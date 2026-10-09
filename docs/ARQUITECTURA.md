@@ -8,7 +8,7 @@ Reto 01 Agente Vocal Cognitivo, Kognia Labs (hackathon)
 
 Fecha: 9 de octubre de 2026
 
-Versión: 0.1.0 (web/package.json). Commit: 85bb801 test: red team of the agent prompt (20 of 20 resisted) and manual approval of the voice checklist
+Versión: 0.1.0 (web/package.json). Commit: f5005f4 docs: RF-005 barge-in criterion adjusted to 1.5 s; all 25 voice tests approved
 
 **Presentado por Daniel Fajardo y Jacobo Jaramillo, en representación de SOLUTIONS TECH WEB SAS**
 
@@ -50,13 +50,13 @@ Solución. Gabriela es un agente de voz en español, accesible desde una URL pú
 | Carga HTTP (k6, 50 000 usuarios) | 51 749 recorridos, 103 498 peticiones, 0 errores, p95 191 ms | Medido |
 | Punto de quiebre HTTP | Cerca de 1 200 peticiones/s ofrecidas; solo 429 de Cloud Run, sin 5xx | Medido |
 | Sesiones de voz simultáneas | 8 por instancia, 16 en el servicio (max-instances 2) | Límite por diseño |
-| Pruebas unitarias | 78 definidas: 74 pasan, 4 en vivo omitidas sin claves, 0 fallos | Medido |
+| Pruebas unitarias | 79 definidas: 75 pasan, 4 en vivo omitidas sin claves, 0 fallos | Medido |
 | Requerimientos | 24 funcionales y 10 no funcionales; 85 casos de prueba | Documentado |
 | Despliegue | Cloud Run, proyecto agente-vocal-hackaton, us-east1, servicio agente-vocal | Construido |
 
 ## 2. Requerimientos y atributos de calidad
 
-Fuente: docs/REQUIREMENTS.md (hoja 01 RETO de V2.xlsx, ADR 0001 y plan). R01 a R07 y la hoja 02 CRITERIOS no fueron entregadas; esos requerimientos se infirieron. Trazabilidad completa en docs/TRACEABILITY.md.
+Fuente: hoja 01 RETO de V2.xlsx, ADR 0001 y plan). R01 a R07 y la hoja 02 CRITERIOS no fueron entregadas; esos requerimientos se infirieron. La trazabilidad (requerimiento por prueba) está en docs/PRUEBAS.md.
 
 ### 2.1 Requerimientos funcionales
 
@@ -380,7 +380,7 @@ Verificado en producción (registro de pruebas en el historial de git de docs/TE
 ### 9.1 Repositorio y flujo de trabajo
 
 - Git con ramas cortas por tarea; mensajes en formato Conventional Commits (feat, fix, docs, refactor, test, chore, security).
-- Regla obligatoria: cada commit agrega al inicio de docs/GUIA-QA.md su entrada (qué se hizo, cómo probarlo, resultado esperado, qué no se puede probar, riesgos), sin secretos.
+- Cada cambio que afecte el comportamiento actualiza docs/PRUEBAS.md con su prueba y resultado.
 - Definición de hecho: funciona, tiene prueba, pasa lint, sin secretos, documentado si cambió el contrato.
 - Trazabilidad: commits, operaciones OpenAPI (x-requirement) y pruebas referencian el ID RF o RNF.
 
@@ -523,13 +523,13 @@ Medido en producción sobre 6 interrupciones con el agente hablando: del inicio 
 
 | Tipo | Ubicación | Resultado |
 |---|---|---|
-| Unitarias (node:test) | web/server/*.test.mjs | 78 definidas: 74 pasan, 4 en vivo omitidas sin LIVE=1 y claves, 0 fallos |
-| Integración contra producción | web/tests/integration/proxy.test.mjs | 16 pruebas: carga de documento, voz con y sin documento, diarización y sentimiento, AskText, límites |
+| Unitarias (node:test) | web/server/*.test.mjs | 79 definidas: 75 pasan, 4 en vivo omitidas sin LIVE=1 y claves, 0 fallos |
+| Integración contra producción | web/tests/integration/proxy.test.mjs | 18 pruebas: carga de documento, voz con y sin documento, diarización y sentimiento, AskText, pregunta tocada, documento a mitad de conversación, solo español, límites |
 | Carga, estrés, picos, capacidad | web/tests/load/*.js (k6) | Ver sección 10 |
 | Seguridad | CI (gitleaks, npm audit), historial de git de docs/TESTING.md | Verificaciones en producción aprobadas; break test manual pendiente |
 | Funcionales y conversación | historial de git de docs/TESTING.md (commit 6eb3dd7), docs/QA-CONVERSACIONES.md | 85 casos CP-001 a CP-085 trazados a requerimientos |
 
-Las pruebas llevan el ID del requerimiento en el nombre. El registro detallado de casos y resultados R-xxx está en el historial de git de docs/TESTING.md (última versión en el commit 6eb3dd7) y la matriz en docs/TRACEABILITY.md. Para las pruebas de audio (latencia, interrupción, diarización) ver docs/PRUEBAS-AUDIO.md.
+Las pruebas llevan el ID del requerimiento en el nombre. El registro detallado de casos y resultados R-xxx está en el historial de git de docs/TESTING.md (última versión en el commit 6eb3dd7) y en docs/PRUEBAS.md (requerimiento por prueba). Para las pruebas de audio (latencia, interrupción, diarización) ver docs/PRUEBAS-AUDIO.md.
 
 ## 12. Riesgos conocidos y deuda técnica
 
@@ -559,9 +559,8 @@ Las pruebas llevan el ID del requerimiento en el nombre. El registro detallado d
 |-- .github/workflows/ci.yml
 |-- infra/deploy.sh
 |-- docs/
-|   |-- ARQUITECTURA.md, PRUEBAS-AUDIO.md
-|   |-- REQUIREMENTS.md, SECURITY.md, TRACEABILITY.md
-|   |-- GUIA-QA.md, QA-CONVERSACIONES.md
+|   |-- ARQUITECTURA.md, PRUEBAS.md, CODIGO.md, PRUEBAS-AUDIO.md
+|   |-- SECURITY.md, QA-CONVERSACIONES.md
 |   |-- adr/0001 a 0004
 |   |-- api/openapi.yaml, api/websocket-protocol.md
 |   |-- diagrams/code/build.py, diagrams/img/*.png

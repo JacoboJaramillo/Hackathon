@@ -98,17 +98,16 @@ El script es idempotente: habilita las APIs, crea las cuentas de servicio de eje
 
 | Documento | Contenido |
 |---|---|
-| [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Arquitectura completa: contexto, módulos, flujo de voz, integraciones, modelo de datos, seguridad, DevOps, capacidad y pruebas |
-| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 33 requerimientos con criterio de aceptación |
-| [docs/TRACEABILITY.md](docs/TRACEABILITY.md) | Requerimiento, módulo, endpoint, datos, pruebas, estado y evidencia |
+| [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Requerimientos (sección 2) y arquitectura completa: contexto, módulos, flujo de voz, integraciones, modelo de datos, seguridad, DevOps, capacidad y pruebas |
 | [docs/api/openapi.yaml](docs/api/openapi.yaml) | Contrato HTTP |
 | [docs/api/websocket-protocol.md](docs/api/websocket-protocol.md) | Protocolo del WebSocket `/ws/agent` |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas, controles, auditoría y deuda |
 | [docs/PRUEBAS-AUDIO.md](docs/PRUEBAS-AUDIO.md) | Reporte de pruebas de audio y voz con lista de verificación |
-| [docs/GUIA-QA.md](docs/GUIA-QA.md) | Bitácora por commit para el QA |
+| [docs/PRUEBAS.md](docs/PRUEBAS.md) | Registro detallado de todas las pruebas, con el requerimiento de cada una |
+| [docs/CODIGO.md](docs/CODIGO.md) | Documentación del código archivo por archivo |
 | [docs/QA-CONVERSACIONES.md](docs/QA-CONVERSACIONES.md) | Guion de unas 200 frases para intentar romper el agente |
 | [CHANGELOG.md](CHANGELOG.md) | Cambios por versión |
 
 ## Qué se generó con IA
 
-El código y la documentación de este repositorio se escribieron con Claude Code bajo dirección y revisión humana: el desarrollador define el alcance, decide y revisa cada cambio, y el QA ejecuta las pruebas y el break test. Nada se da por bueno por haber sido generado: lo verifican las pruebas automáticas (`web/server/*.test.mjs`, integración contra producción, k6), la CI con gitleaks y `npm audit`, y una auditoría de seguridad cuyos hallazgos se corrigieron (ver [docs/SECURITY.md](docs/SECURITY.md)). Lo que el historial de git de `docs/TESTING.md` (commit 6eb3dd7) marca como Pendiente no está verificado. En tiempo de ejecución, el agente usa modelos de lenguaje de terceros (DeepSeek, a través de Deepgram) y puede equivocarse; por eso su prompt le prohíbe diagnosticar y le exige decir que no sabe cuando el dato no está en el documento ni en el registro.
+El código y la documentación de este repositorio se escribieron con Claude Code bajo dirección y revisión humana: el desarrollador define el alcance, decide y revisa cada cambio, y el QA ejecuta las pruebas y el break test. Nada se da por bueno por haber sido generado: lo verifican las pruebas automáticas (`web/server/*.test.mjs`, integración contra producción, k6), la CI con gitleaks y `npm audit`, y una auditoría de seguridad cuyos hallazgos se corrigieron (ver [docs/SECURITY.md](docs/SECURITY.md)). Lo que `docs/PRUEBAS.md` marca como Pendiente no está verificado. En tiempo de ejecución, el agente usa modelos de lenguaje de terceros (DeepSeek, a través de Deepgram) y puede equivocarse; por eso su prompt le prohíbe diagnosticar y le exige decir que no sabe cuando el dato no está en el documento ni en el registro.

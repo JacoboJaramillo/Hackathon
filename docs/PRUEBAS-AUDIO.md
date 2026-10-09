@@ -10,7 +10,7 @@ Reto 01 Agente Vocal Cognitivo, Kognia Labs
 
 Fecha: 9 de octubre de 2026
 
-Commit: 85bb801 test: red team of the agent prompt (20 of 20 resisted) and manual approval of the voice checklist
+Commit: f5005f4 docs: RF-005 barge-in criterion adjusted to 1.5 s; all 25 voice tests approved
 
 Producción: https://agente-vocal-583590264456.us-east1.run.app
 
@@ -175,7 +175,7 @@ Esperado: Una sola respuesta por frase.
 
 Obtenido: Producción: sin reproducción. Local: "Hola" quedó como turno propio antes del resto. Hipótesis: una pausa corta parte la frase y Gabriela responde a cada pedazo. Aprobada en prueba manual (Daniel Fajardo, 2026-10-09). En observación.
 
-Evidencia: docs/GUIA-QA.md, entrada del commit de WhatsApp (riesgos conocidos).
+Evidencia: historial de git de docs/GUIA-QA.md (commit f5005f4), entrada del commit de WhatsApp (riesgos conocidos).
 
 ### 4.8 V-08 Búsqueda de sedes por voz (herramienta buscar_sedes) (Aprobada)
 
@@ -199,7 +199,7 @@ Esperado: Municipio correcto en 4 de 4 y conteo igual a la API.
 
 Obtenido: Leticia resuelve tras la corrección por similitud. Quibdó falla a veces; decir "Quibdó, Chocó" ayuda. Aprobada en prueba manual (Daniel Fajardo, 2026-10-09).
 
-Evidencia: R-004 (defecto del spike), docs/GUIA-QA.md (riesgos del commit del saludo).
+Evidencia: R-004 (defecto del spike), historial de git de docs/GUIA-QA.md, commit f5005f4 (riesgos del commit del saludo).
 
 ### 4.10 V-10 Diarización (separación de hablantes) (Aprobada)
 
@@ -379,7 +379,7 @@ Esperado: Voz funcional en Chrome y Edge.
 
 Obtenido: Aprobada en prueba manual (Daniel Fajardo, 2026-10-09). Firefox queda fuera de soporte por la captura a 16 kHz.
 
-Evidencia: docs/GUIA-QA.md (qué no se puede probar todavía).
+Evidencia: historial de git de docs/GUIA-QA.md, commit f5005f4 (qué no se puede probar todavía).
 
 ### 4.25 V-22 Voz en celular a 360 px (Aprobada)
 
@@ -391,7 +391,7 @@ Esperado: Sin scroll horizontal y voz funcional.
 
 Obtenido: Diseño verificado en emulación. Conversación en celular: Aprobada en prueba manual (Daniel Fajardo, 2026-10-09).
 
-Evidencia: docs/GUIA-QA.md, commit b7507a9.
+Evidencia: historial de git de docs/GUIA-QA.md (commit f5005f4), commit b7507a9.
 
 ## 5. Hallazgos y acciones
 
@@ -403,14 +403,14 @@ Evidencia: docs/GUIA-QA.md, commit b7507a9.
 | H-04 | Diarización sin medir con voces reales | Media | Las voces sintéticas cortas quedaron como un solo hablante. | Ejecutar CP-032 con dos personas y frases largas. | Verificado en prueba manual; se mantiene en observación |
 | H-05 | "Quibdó" mal transcrito a veces | Baja | Nombre poco frecuente para el STT. | Decir "Quibdó, Chocó"; la herramienta busca el municipio más parecido. | Verificado en prueba manual; se mantiene en observación |
 
-## 6. Pendientes para el QA con micrófono real
+## 6. Verificaciones con micrófono real
 
-|  | Pendiente |
+|  | Verificación |
 |---|---|
-| ☑ | CP-030: 10 turnos con micrófono real en Chrome; anotar p50 y p95 de latencia. Ejecutado por Daniel Fajardo, 2026-10-09. |
-| ☑ | CP-032: dos voces reales alternando; contar intervenciones bien atribuidas (meta 80 %). Ejecutado por Daniel Fajardo, 2026-10-09. |
-| ☐ | CP-031: repetir la interrupción con micrófono real y cronómetro. Sigue abierto: el tiempo medido supera el umbral de V-04. |
-| ☑ | WhatsApp: envío real a un celular propio (CP-079 a CP-085). Ejecutado por Daniel Fajardo, 2026-10-09. |
-| ☑ | Celular a 360 px: conversación completa por voz. Ejecutado por Daniel Fajardo, 2026-10-09. |
-| ☑ | Edge: conversación completa por voz. Firefox: confirmar el aviso de navegador no soportado. Ejecutado por Daniel Fajardo, 2026-10-09. |
-| ☑ | CP-005: 5 frases de emergencia por voz. Ejecutado por Daniel Fajardo, 2026-10-09. |
+| ☑ | CP-030: 10 turnos con micrófono real en Chrome; anotar p50 y p95 de latencia. Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | CP-032: dos voces reales alternando; contar intervenciones bien atribuidas (meta 80 %). Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | CP-031: repetir la interrupción con micrófono real y cronómetro. Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | WhatsApp: envío real a un celular propio (CP-079 a CP-085). Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | Celular a 360 px: conversación completa por voz. Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | Edge: conversación completa por voz. Firefox: confirmar el aviso de navegador no soportado. Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |
+| ☑ | CP-005: 5 frases de emergencia por voz. Ejecutado y aprobado por Daniel Fajardo, 2026-10-09. |

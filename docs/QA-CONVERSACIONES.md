@@ -1,6 +1,6 @@
 # Guion de conversaciones para romper el agente
 
-Lista de frases para que el QA (Jacobo) las diga en voz alta al agente, tal como lo haría un jurado que intenta romper el sistema. Complementa `docs/PRUEBAS-AUDIO.md` (pruebas de voz) y los casos formales en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas) y `docs/GUIA-QA.md` (cómo levantar y probar).
+Lista de frases para que el QA (Jacobo) las diga en voz alta al agente, tal como lo haría un jurado que intenta romper el sistema. Complementa `docs/PRUEBAS-AUDIO.md` (pruebas de voz) y los casos formales en el historial de git de `docs/TESTING.md` (última versión en el commit 6eb3dd7, resumida en `docs/ARQUITECTURA.md` sección 11 Pruebas) y `docs/PRUEBAS.md` (cómo probar).
 
 ## Cómo usar esta lista
 
