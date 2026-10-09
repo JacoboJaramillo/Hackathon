@@ -115,6 +115,7 @@ Mínima, viva y en el repositorio. Nada que se desactualice en horas.
 | `docs/diagrams/` | Fuentes de los diagramas (`.json` de FossFLOW, `.mmd` de Mermaid) y sus exportaciones. |
 | `docs/TEST-PLAN.md` | Plan de pruebas profesional (ver sección 5.4). |
 | `docs/TESTING.md` | Ejecución del QA: casos, matriz de roles, break test, resultados. |
+| `docs/GUIA-QA.md` | Bitácora por commit: qué se hizo y cómo probarlo paso a paso. Es lo primero que lee el QA. |
 | `.env.example` | Todas las variables con valores falsos. Nunca valores reales. |
 | `CHANGELOG.md` | Cambios por versión. |
 
@@ -205,6 +206,7 @@ Reglas:
 - Ramas cortas por tarea; PR revisado por la otra persona o por `/code-review` antes de merge.
 - CI mínimo: lint, pruebas, escaneo de secretos y de dependencias.
 - Definición de hecho: funciona, tiene prueba, pasa lint, sin secretos, documentado si cambió el contrato.
+- **Regla obligatoria de cada commit:** el mismo commit agrega una entrada al inicio de `docs/GUIA-QA.md` (la más reciente arriba). La entrada lleva el título del commit, la fecha y hora, qué se hizo en lenguaje simple, cómo probarlo paso a paso con comandos copiables, el resultado esperado, qué no se puede probar todavía y por qué, y los riesgos conocidos. Nunca incluye secretos ni valores del `.env`. Un commit sin su entrada no está terminado. Objetivo: que el QA (Jacobo) siga el proyecto sin depender del chat.
 - Reparto: el desarrollador construye; el QA escribe casos desde el contrato OpenAPI en paralelo, prueba contra los criterios de aceptación y ejecuta el break test.
 - Congelar funcionalidades unas horas antes de la entrega; ese tiempo es para auditoría, pruebas y demo.
 
