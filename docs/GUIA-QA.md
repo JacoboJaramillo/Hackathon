@@ -43,6 +43,25 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### feat: architecture docs, CI, reproducible infra and least-privilege build
+Fecha: 2026-10-09, 10:55.
+
+Qué se hizo:
+- Documentación de arquitectura para el jurado: `docs/ARCHITECTURE.md` con 5 diagramas (contexto, contenedores, despliegue, secuencia de voz y límites de confianza), ADR 0002 (stack y monolito modular), ADR 0003 (Cloud Run) y ADR 0004 (acceso público sin login). Contrato de la API en `docs/api/openapi.yaml` y protocolo del WebSocket en `docs/api/websocket-protocol.md`.
+- CI en GitHub Actions (`.github/workflows/ci.yml`): en cada push corre lint, pruebas, `npm audit`, build y gitleaks. No despliega.
+- Infraestructura como script: `infra/deploy.sh` crea las cuentas de servicio y los permisos y luego despliega. Se puede correr varias veces sin romper nada.
+- Cloud Build usa su propia cuenta con permisos mínimos. La cuenta por defecto perdió el rol Editor.
+- Los secretos quedan fijados por versión en cada revisión, y hay sondas de salud de arranque y de vida contra `/api/health`.
+- La conexión con Deepgram tiene un timeout de 10 s y `buscar_sedes` un plazo total de 12 s.
+
+Cómo probarlo:
+1. En GitHub, pestaña Actions: el workflow CI del último commit debe estar en verde.
+2. `bash infra/deploy.sh` (necesita `gcloud` con acceso al proyecto): termina con `{"status":"ok"}`.
+3. Leer `docs/ARCHITECTURE.md` en GitHub: los diagramas deben verse dibujados, no como texto.
+4. Consola de GCP, IAM del proyecto `agente-vocal-hackaton`: la cuenta `...-compute@developer` ya no tiene el rol Editor.
+
+Riesgos conocidos: no hay alerta de presupuesto, porque la debe crear el administrador de la cuenta de facturación.
+
 ### feat: voice proxy server, buscar_sedes tool, Cloud Run deploy and QA suite
 Fecha: 2026-10-09, 10:40.
 

@@ -1,0 +1,12 @@
+flowchart LR
+  usuario["Ciudadano o jurado - navegador con micrófono"]
+  sistema["¿Dónde me atienden? - servicio agente-vocal en Cloud Run"]
+  deepgram["Deepgram Voice Agent API - STT nova-3 y TTS aura-2-celeste-es"]
+  deepseek["DeepSeek API - modelo deepseek-chat"]
+  datosgov["datos.gov.co - dataset IPS s2ru-bqt6"]
+
+  usuario -- "HTTPS: página y GET /api/health" --> sistema
+  usuario -- "WSS /ws/agent: audio PCM y eventos" --> sistema
+  sistema -- "WSS: Settings, audio y FunctionCallResponse" --> deepgram
+  deepgram -- "HTTPS: chat completions con la clave de DeepSeek" --> deepseek
+  sistema -- "HTTPS: consulta SoQL con X-App-Token" --> datosgov

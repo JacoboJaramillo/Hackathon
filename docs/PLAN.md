@@ -1,5 +1,7 @@
 # Plan de trabajo: Reto 01, Agente Vocal Cognitivo
 
+> Documento inicial. El stack (FastAPI), la ruta `/ws/session`, SODA3 y los tamaños de Cloud Run quedaron reemplazados: la fuente de verdad es `docs/ARCHITECTURE.md` y los ADR 0002 a 0004.
+
 Fuente: `V2.xlsx` (hoja "01 RETO"). Equipo: 1 desarrollador + 1 QA. Despliegue: Google Cloud, proyecto `agente-vocal-hackaton`.
 
 ## 1. Qué hay que construir

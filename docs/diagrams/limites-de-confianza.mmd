@@ -1,0 +1,37 @@
+flowchart LR
+  subgraph z0["Zona 0 - no confiable"]
+    nav["Navegador del usuario - audio, Origin, X-Forwarded-For"]
+  end
+
+  subgraph z1["Zona 1 - borde de Google"]
+    gfe["Front end de Cloud Run - TLS y X-Forwarded-For"]
+  end
+
+  subgraph z2["Zona 2 - nuestro servidor, confiable"]
+    adm["Admisión - limits.mjs"]
+    proxy["Proxy de sesión - server.mjs"]
+    tool["buscar_sedes - ips.mjs"]
+    env["Claves en memoria del proceso"]
+  end
+
+  subgraph z3["Zona 3 - terceros con contrato de servicio"]
+    dg["Deepgram - recibe audio y la clave de DeepSeek"]
+    ds["DeepSeek - recibe texto de la conversación"]
+    dt["datos.gov.co - recibe municipio y tipo de atención"]
+  end
+
+  subgraph z4["Zona 4 - plano de control de GCP"]
+    sm["Secret Manager"]
+    iam["IAM y cuentas de servicio"]
+  end
+
+  nav -- "B1: todo input se valida" --> gfe
+  gfe --> adm
+  adm -- "solo si pasa los cuatro controles" --> proxy
+  proxy -- "B2: solo audio y KeepAlive salen hacia arriba" --> dg
+  dg -- "B2: solo eventos de la lista blanca bajan" --> proxy
+  dg --> ds
+  proxy -- "B3: argumentos validados y literales escapados" --> tool
+  tool --> dt
+  sm -- "B4: inyección al desplegar" --> env
+  iam --> sm

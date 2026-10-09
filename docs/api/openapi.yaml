@@ -1,0 +1,139 @@
+openapi: 3.1.0
+info:
+  title: "¿Dónde me atienden? - API del agente vocal"
+  version: 0.1.0
+  description: |
+    Contrato HTTP del servicio agente-vocal (Reto 01, Kognia Labs). El servicio
+    es público y sin autenticación (ver docs/adr/0004-acceso-publico-sin-login.md).
+
+    La conversación por voz usa un WebSocket. OpenAPI no modela WebSockets, por
+    eso aquí solo se documenta el upgrade HTTP de /ws/agent y sus respuestas de
+    rechazo; los mensajes, códigos de cierre y límites están en
+    docs/api/websocket-protocol.md.
+
+    Todas las respuestas llevan las cabeceras de seguridad definidas en
+    web/next.config.mjs: Strict-Transport-Security, Content-Security-Policy-Report-Only,
+    X-Content-Type-Options, X-Frame-Options, Referrer-Policy y Permissions-Policy
+    (RNF-005). Las respuestas de rechazo del upgrade las escribe server.mjs
+    directamente sobre el socket y no llevan esas cabeceras.
+servers:
+  - url: https://agente-vocal-583590264456.us-east1.run.app
+    description: Producción (Cloud Run, us-east1)
+  - url: http://localhost:3000
+    description: Desarrollo local (npm run dev)
+security: []
+tags:
+  - name: operacion
+    description: Salud del servicio.
+  - name: voz
+    description: Conversación por voz.
+paths:
+  /api/health:
+    get:
+      tags: [operacion]
+      operationId: getHealth
+      summary: Verificación de salud
+      description: Responde 200 si el proceso está sirviendo peticiones. No consulta proveedores externos.
+      x-requirement: [RNF-003, RNF-001]
+      responses:
+        "200":
+          description: El servicio está en línea.
+          headers:
+            Cache-Control:
+              description: Siempre no-store.
+              schema:
+                type: string
+                const: no-store
+            Strict-Transport-Security:
+              $ref: "#/components/headers/Strict-Transport-Security"
+            X-Content-Type-Options:
+              $ref: "#/components/headers/X-Content-Type-Options"
+            X-Frame-Options:
+              $ref: "#/components/headers/X-Frame-Options"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              example:
+                status: ok
+  /ws/agent:
+    get:
+      tags: [voz]
+      operationId: openVoiceSession
+      summary: Abre una sesión de voz (upgrade a WebSocket)
+      description: |
+        Upgrade HTTP a WebSocket. Tras el 101, el protocolo de mensajes está en
+        docs/api/websocket-protocol.md.
+
+        Controles de admisión, en este orden: Origin en la lista blanca
+        ALLOWED_ORIGINS (403), tasa de 10 intentos por minuto por IP (429),
+        cupo global de 8 sesiones por instancia (503) y cupo de 2 sesiones
+        simultáneas por IP (429). La IP del cliente es la última entrada de
+        X-Forwarded-For. Los rechazos tienen cuerpo vacío y cierran la conexión.
+      x-requirement: [RF-004, RF-005, RF-009, RF-019, RNF-004]
+      x-protocol: websocket
+      x-protocol-doc: docs/api/websocket-protocol.md
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Debe coincidir exactamente con un origen de ALLOWED_ORIGINS.
+          schema:
+            type: string
+            format: uri
+          example: https://agente-vocal-583590264456.us-east1.run.app
+        - name: Upgrade
+          in: header
+          required: true
+          schema:
+            type: string
+            const: websocket
+        - name: Sec-WebSocket-Version
+          in: header
+          required: true
+          schema:
+            type: string
+            const: "13"
+        - name: Sec-WebSocket-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: Upgrade aceptado. Comienza la sesión WebSocket.
+        "403":
+          description: Origin ausente o fuera de la lista blanca (motivo bad_origin).
+        "429":
+          description: Más de 10 intentos por minuto desde la IP (rate_limited) o ya hay 2 sesiones activas de la IP (ip_cap).
+          headers:
+            Retry-After:
+              description: Segundos a esperar antes de reintentar.
+              schema:
+                type: integer
+                const: 60
+        "503":
+          description: La instancia alcanzó el cupo global de sesiones (global_cap).
+components:
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+  headers:
+    Strict-Transport-Security:
+      schema:
+        type: string
+        const: max-age=63072000; includeSubDomains
+    X-Content-Type-Options:
+      schema:
+        type: string
+        const: nosniff
+    X-Frame-Options:
+      schema:
+        type: string
+        const: DENY

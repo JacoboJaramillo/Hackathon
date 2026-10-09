@@ -1,0 +1,33 @@
+flowchart LR
+  subgraph nav["Navegador - no confiable"]
+    ui["Interfaz React - tarjetas de sedes, planeado"]
+    mic["Captura de micrófono - PCM 16 kHz linear16"]
+  end
+
+  subgraph run["Contenedor único en Cloud Run - Node 24"]
+    srv["server.mjs - servidor HTTP y proxy WebSocket /ws/agent"]
+    nextjs["Next.js 15.5 - páginas y GET /api/health"]
+    limits["server/limits.mjs - admisión: Origin, cupos y tasa"]
+    settings["server/agent-settings.mjs - prompt y mensaje Settings"]
+    ips["server/ips.mjs - herramienta buscar_sedes"]
+    docmod["Documento y brief - planeado"]
+    diar["Transcripción diarizada y sentimiento - planeado"]
+  end
+
+  deepgram["Deepgram Voice Agent API"]
+  deepseek["DeepSeek API"]
+  datosgov["datos.gov.co SODA2"]
+
+  ui -- "HTTPS" --> nextjs
+  mic -- "WSS binario" --> srv
+  srv -- "eventos permitidos y audio 24 kHz" --> ui
+  srv --> limits
+  srv --> settings
+  srv --> ips
+  srv -.-> docmod
+  srv -.-> diar
+  srv -- "WSS con Authorization Token" --> deepgram
+  deepgram -- "HTTPS" --> deepseek
+  ips -- "HTTPS GET con X-App-Token" --> datosgov
+  diar -.-> deepgram
+  diar -.-> deepseek

@@ -16,6 +16,13 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || (dev ? `http://localhost
   .split(',').map((s) => s.trim()).filter(Boolean);
 const SESSION_MAX_MS = Number(process.env.SESSION_MAX_MS) || 10 * 60_000;
 const MAX_FRAME_BYTES = 64 * 1024;
+// One tool call may page through datos.gov.co several times; cap the total so
+// the voice turn never hangs on a slow upstream.
+const TOOL_DEADLINE_MS = 12_000;
+const withDeadline = (promise, ms) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error('deadline')), ms).unref()),
+]);
 const DEEPGRAM_URL = 'wss://agent.deepgram.com/v1/agent/converse';
 // Upstream events the browser needs; everything else stays on the server.
 const FORWARD_TYPES = new Set([
@@ -68,7 +75,10 @@ server.on('upgrade', (req, socket, head) => {
 function runSession(client, { id, ip, release }) {
   logEvent('session_start', { id, ip });
   const started = Date.now();
-  const upstream = new WebSocket(DEEPGRAM_URL, { headers: { Authorization: `Token ${DEEPGRAM_API_KEY}` } });
+  const upstream = new WebSocket(DEEPGRAM_URL, {
+    headers: { Authorization: `Token ${DEEPGRAM_API_KEY}` },
+    handshakeTimeout: 10_000,
+  });
   const pending = [];
   let closed = false;
 
@@ -108,7 +118,8 @@ function runSession(client, { id, ip, release }) {
     for (const f of msg.functions || []) {
       if (!f.client_side) continue;
       const result = f.name === 'buscar_sedes'
-        ? await buscarSedes(f.arguments, { token: DATOSGOV_APP_TOKEN }).catch(() => ({ error: 'servicio_no_disponible' }))
+        ? await withDeadline(buscarSedes(f.arguments, { token: DATOSGOV_APP_TOKEN }), TOOL_DEADLINE_MS)
+          .catch(() => ({ error: 'servicio_no_disponible' }))
         : { error: 'funcion_desconocida' };
       logEvent('tool_call', { id, name: f.name, error: result.error || null, total: result.total_sedes ?? null });
       sendClient({ type: 'ToolResult', name: f.name, result });

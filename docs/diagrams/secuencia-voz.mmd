@@ -1,0 +1,41 @@
+sequenceDiagram
+  autonumber
+  participant N as Navegador
+  participant S as Servidor agente-vocal
+  participant DG as Deepgram Voice Agent
+  participant DS as DeepSeek
+  participant DT as datos.gov.co
+
+  N->>S: GET /ws/agent con Upgrade y Origin
+  S->>S: Origin en lista blanca, cupo por IP, tasa por minuto y cupo global
+  S-->>N: 101 Switching Protocols
+  S->>DG: Abre wss agent/converse con Authorization Token
+  S->>DG: Settings con prompt, herramienta y clave de DeepSeek
+  DG-->>S: Welcome y SettingsApplied
+  S-->>N: Welcome y SettingsApplied
+  DG-->>S: Audio del saludo 24 kHz
+  S-->>N: Frames binarios de audio
+  loop Cada turno
+    N->>S: Frames binarios PCM 16 kHz
+    S->>DG: Mismos frames sin modificar
+    DG-->>S: UserStartedSpeaking y ConversationText del usuario
+    S-->>N: UserStartedSpeaking y ConversationText
+    DG->>DS: chat completions con historial y herramientas
+    DS-->>DG: Llamada a buscar_sedes con argumentos
+    DG-->>S: FunctionCallRequest
+    S->>S: validateArgs y resolución del municipio
+    S->>DT: GET resource s2ru-bqt6 con X-App-Token, timeout 8 s
+    DT-->>S: Filas con columnas de la lista blanca
+    S-->>N: ToolResult con hasta 20 sedes
+    S->>DG: FunctionCallResponse
+    DG->>DS: chat completions con el resultado
+    DS-->>DG: Texto de respuesta
+    DG-->>S: AgentThinking, ConversationText y AgentStartedSpeaking
+    S-->>N: AgentThinking, ConversationText y AgentStartedSpeaking
+    DG-->>S: Audio TTS 24 kHz
+    S-->>N: Frames binarios de audio
+    DG-->>S: AgentAudioDone
+    S-->>N: AgentAudioDone
+  end
+  N->>S: Cierre normal o límite de 10 minutos
+  S->>DG: terminate
