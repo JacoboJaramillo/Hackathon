@@ -43,6 +43,25 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### test: 50 000 user load test and capacity model to 100 000 users
+Fecha: 2026-10-09, 12:05.
+
+Qué se hizo:
+- Prueba de carga contra producción con 51 749 usuarios en 5,8 minutos (cargan la página y la salud): 103 498 peticiones, 0 errores, p95 191 ms, con 2 instancias.
+- Prueba de estrés: el servicio sirvió unas 770 peticiones por segundo sin ningún error 5xx. Al ofrecer unas 1 200 por segundo aparecen rechazos 429 de Cloud Run, porque el tope actual es de 2 instancias por 40 peticiones simultáneas. Ese es el punto de quiebre medido.
+- `docs/CAPACITY.md`: lo medido, el modelo de capacidad separado en páginas, cargas de documento y sesiones de voz, y "Cómo llegar a 100.000 usuarios": cuentas, cambios concretos (más instancias, Redis para el limitador y los documentos, CDN, cupos de Deepgram) y la verificación pendiente. Lo proyectado está marcado como proyección.
+- Script `web/tests/load/users-50k.js`.
+
+Cómo probarlo (solo contra nuestro despliegue; no abre sesiones de voz ni sube documentos, que cuestan dinero):
+`MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd)/web/tests/load:/scripts" -e BASE_URL=https://agente-vocal-583590264456.us-east1.run.app grafana/k6:2.2.0 run /scripts/users-50k.js`
+Con `-e PHASE=stress` corre el estrés.
+
+Resultado esperado: más de 50 000 recorridos, errores bajo 1 %, p95 bajo 1 500 ms.
+
+Qué no se puede probar todavía: 100 000 usuarios simultáneos reales; necesita un generador distribuido y subir `max-instances`, como explica `docs/CAPACITY.md`. Sesiones de voz a escala no se prueban por costo.
+
+Riesgos conocidos: durante el estrés se desplegó una revisión nueva, por eso el punto de quiebre es aproximado. Correr el estrés vuelve lenta la página para quien la esté usando.
+
 ### fix: talk button waits for the page to be ready
 Fecha: 2026-10-09, 11:58.
 
