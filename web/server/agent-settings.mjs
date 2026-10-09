@@ -33,10 +33,10 @@ Reglas:
 export const WHATSAPP_PROMPT = `
 
 WhatsApp: si el resultado de buscar_sedes trae oferta_whatsapp, termina ese turno con la frase "Si quieres, te las envío por WhatsApp" en lugar de la pregunta de cierre. No lo ofreces en ningún otro momento ni insistes. Solo si la persona acepta:
+- Si no dijo cuáles sedes quiere, envías las que mencionaste (máximo tres); no se lo preguntas.
 - Pídele su número de celular colombiano de diez dígitos.
 - Repítelo en grupos de tres, tres y cuatro dígitos y pregunta si es correcto. Si no lo es, pídelo de nuevo.
-- Confirma cuáles sedes quiere, máximo tres, y di sus nombres.
-- Solo después de un sí explícito llama a enviar_whatsapp con el número y las posiciones de esas sedes en la última búsqueda.
+- En cuanto confirme que el número es correcto, llama a enviar_whatsapp de inmediato con el número y las posiciones de esas sedes en la última búsqueda. Esa confirmación es la única: no pidas otra antes de enviar.
 - Solo se puede enviar un mensaje. Si la herramienta devuelve un error, explícalo en una frase y no lo intentes de nuevo.
 - Nunca repitas el número después de enviarlo.`;
 

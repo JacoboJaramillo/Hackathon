@@ -43,6 +43,27 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### fix: WhatsApp sends right after the number is confirmed; deliverables published as Markdown
+Fecha: 2026-10-09, 14:55.
+
+Qué se hizo:
+- Gabriela ya no pide una segunda confirmación antes de enviar por WhatsApp. Cuando la persona dice que el número repetido es correcto, envía de inmediato. Si no dijo cuáles sedes quiere, envía las tres que mencionó, sin preguntar.
+- Los dos documentos Word ahora también están en GitHub, con todo su contenido, tablas y figuras:
+  - `docs/ARQUITECTURA-Y-DEVOPS.md`
+  - `docs/PRUEBAS-AUDIO.md`
+- Se generan con `python docs/entregables/docx_to_md.py` a partir de los `.docx`, así el Word y el Markdown no se separan.
+
+Cómo probarlo:
+1. Prueba local hecha con el envío bloqueado a propósito (identificador de número inválido). Gabriela ofreció WhatsApp, pidió el número y lo repitió. Tras "Sí, es correcto" llamó a `enviar_whatsapp` de inmediato, sin otra pregunta, y avisó que no pudo enviar, que es lo esperado con el envío bloqueado.
+2. En producción, después del despliegue: pedir sedes, aceptar WhatsApp, dictar tu número y decir "sí, es correcto". Debe llegar el mensaje sin más preguntas.
+3. Abrir los dos `.md` en GitHub y comprobar que se ven las tablas y las 6 figuras.
+
+Resultado esperado: una sola confirmación (la del número) antes de enviar.
+
+Qué no se puede probar todavía y por qué: el envío real con este cambio, hasta desplegarlo.
+
+Riesgos conocidos: si la persona confirma un número mal reconocido, el mensaje va a ese número. El límite de uno por número cada 10 minutos impide que se repita.
+
 ### docs: deliverables (architecture and DevOps, audio test report), architecture diagrams, measured latency and barge-in
 Fecha: 2026-10-09, 14:40.
 
