@@ -56,6 +56,10 @@ export default function VoicePanel({
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const cancelledRef = useRef(false);
+  // The server-rendered button is inert until React hydrates; a click before
+  // that would be lost silently, so it stays disabled until then.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const logRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => () => stopRef.current?.(), []);
@@ -250,11 +254,12 @@ export default function VoicePanel({
           cancelledRef.current = true;
           setStatus("idle");
         }}
+        disabled={!hydrated}
         className={`mt-4 rounded-xl px-4 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60 ${
           active ? "bg-danger" : "bg-accent"
         }`}
       >
-        {active ? "Terminar" : "Hablar"}
+        {!hydrated ? "Cargando..." : status === "permission" ? "Cancelar" : active ? "Terminar" : "Hablar"}
       </button>
 
       {status === "permission" && (

@@ -43,6 +43,19 @@ Requisitos: Node 24 y npm 11 (`node -v`, `npm -v`).
 
 ## Entradas
 
+### fix: talk button waits for the page to be ready
+Fecha: 2026-10-09, 11:58.
+
+Qué se hizo: el botón Hablar dice "Cargando..." y está desactivado hasta que la página termina de cargar su JavaScript. Antes, un clic en los primeros segundos (más largos si el servidor está ocupado) se perdía sin aviso y parecía que la página no dejaba hablar. Mientras se espera el permiso del micrófono, el botón dice "Cancelar".
+
+Cómo probarlo: en Chrome, DevTools, pestaña Network, limitar a "Slow 4G" y recargar. El botón debe decir "Cargando..." unos segundos y luego "Hablar"; al pulsarlo debe aparecer el aviso del micrófono.
+
+Resultado esperado: ningún clic perdido.
+
+Qué no se puede probar todavía: diarización y sentimiento (paso 5).
+
+Riesgos conocidos: ninguno nuevo.
+
 ### security: audit fixes for uploads and limiter; clearer microphone permission flow
 Fecha: 2026-10-09, 11:50.
 
